@@ -1,19 +1,17 @@
 import logging
 from collections import OrderedDict
-import copy
-from datetime import datetime, date
+from datetime import datetime
 
 import jinja2
-from arca import Arca, Task
+from arca import Task
 
 from naucse.modelutils import Model, YamlProperty, DataProperty, DirProperty, MultipleModelDirProperty, ForkProperty
-from naucse.modelutils import reify
+from naucse.modelutils import reify, arca
 from naucse.templates import setup_jinja_env, vars_functions
 from naucse.markdown_util import convert_markdown
 from naucse.notebook_util import convert_notebook
 from pathlib import Path
 
-arca = Arca(settings={"ARCA_BACKEND_VERBOSITY": 2})
 
 
 class Lesson(Model):

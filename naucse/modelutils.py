@@ -4,9 +4,10 @@ from pathlib import Path
 import sys
 
 import yaml
-from arca import Task, Arca, VenvBackend
+from arca import Task, Arca
 
-arca = Arca(VenvBackend(verbosity=2))
+arca = Arca(settings={"ARCA_BACKEND_VERBOSITY": 2,
+                      "ARCA_CACHE_BACKEND": "dogpile.cache.memory"})
 
 NOTHING = object()
 
