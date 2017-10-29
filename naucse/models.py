@@ -4,7 +4,7 @@ import copy
 from datetime import datetime, date
 
 import jinja2
-from arca import Arca, Task, VenvBackend, Result
+from arca import Arca, Task
 
 from naucse.modelutils import Model, YamlProperty, DataProperty, DirProperty, MultipleModelDirProperty, ForkProperty
 from naucse.modelutils import reify
@@ -13,7 +13,7 @@ from naucse.markdown_util import convert_markdown
 from naucse.notebook_util import convert_notebook
 from pathlib import Path
 
-arca = Arca(VenvBackend(verbosity=2))
+arca = Arca(settings={"ARCA_BACKEND_VERBOSITY": 2})
 
 
 class Lesson(Model):
@@ -427,8 +427,8 @@ class CourseLink(CourseMixin, Model):
     """
 
     link = YamlProperty()
-    repo = DataProperty(link)
-    branch = DataProperty(link)
+    repo: str = DataProperty(link)
+    branch: str = DataProperty(link)
 
     info = ForkProperty(repo, branch, function_call="naucse.utils.course_info",
                         args=lambda instance: [instance.slug],
