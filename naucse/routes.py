@@ -1,3 +1,4 @@
+import logging
 import os
 import datetime
 
@@ -95,8 +96,9 @@ def courses():
                            edit_path=model.courses_edit_path)
 
 
-@app.route('/lessons/<lesson:lesson>/static/<path:path>')
-def lesson_static(lesson, path):
+@app.route('/lessons/<lesson:lesson>/static/<path:path>', defaults={"course": None})
+@app.route('/<course:course>/<lesson:lesson>/static/<path:path>')
+def lesson_static(course, lesson, path):
     """Get the endpoint for static files in lessons.
 
     Args:
@@ -106,6 +108,9 @@ def lesson_static(lesson, path):
     Returns:
         endpoint for the static file
     """
+    if course is not None and course.is_link():
+        return send_from_directory(*course.lesson_static(lesson, path))
+
     directory = str(lesson.path)
     filename = os.path.join('static', path)
     return send_from_directory(directory, filename)
@@ -113,6 +118,9 @@ def lesson_static(lesson, path):
 
 @app.route('/<course:course>/')
 def course(course):
+    if course.is_link():
+        return course.render_course()
+
     def lesson_url(lesson, *args, **kwargs):
         return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
 
@@ -132,8 +140,10 @@ def course(course):
 def render_page(page, solution=None, vars=None, **kwargs):
     lesson = page.lesson
 
+    course = kwargs.get("course", None)
+
     def static_url(path):
-        return url_for('lesson_static', lesson=lesson, path=path)
+        return url_for('lesson_static', lesson=lesson, path=path, course=course)
 
     try:
         content = page.render_html(
@@ -166,6 +176,8 @@ def render_page(page, solution=None, vars=None, **kwargs):
 @app.route('/<course:course>/<lesson:lesson>/<page>/solutions/<int:solution>/')
 def course_page(course, lesson, page, solution=None):
     """Render the html of the given lesson page in the course."""
+    if course.is_link():
+        return course.render_page(lesson, page, solution)
 
     for session in course.sessions.values():
         for material in session.materials:
@@ -226,6 +238,8 @@ def session_coverpage(course, session, coverpage):
     Returns:
         rendered session coverpage
     """
+    if course.is_link():
+        return course.render_session_coverpage(session, coverpage)
 
     session = course.sessions.get(session)
 

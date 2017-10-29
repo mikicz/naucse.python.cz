@@ -1,14 +1,19 @@
+import logging
 from collections import OrderedDict
 import copy
+from datetime import datetime, date
 
 import jinja2
+from arca import Arca, Task, VenvBackend, Result
 
-from naucse.modelutils import Model, YamlProperty, DataProperty, DirProperty
+from naucse.modelutils import Model, YamlProperty, DataProperty, DirProperty, MultipleModelDirProperty, ForkProperty
 from naucse.modelutils import reify
 from naucse.templates import setup_jinja_env, vars_functions
 from naucse.markdown_util import convert_markdown
 from naucse.notebook_util import convert_notebook
 from pathlib import Path
+
+arca = Arca(VenvBackend(verbosity=2))
 
 
 class Lesson(Model):
@@ -355,7 +360,25 @@ def _get_sessions(course, plan):
     return result
 
 
-class Course(Model):
+class CourseMixin:
+
+    @reify
+    def slug(self):
+        directory = self.path.parts[-1]
+        parent_directory = self.path.parts[-2]
+        if parent_directory == "courses":
+            parent_directory = "course" # legacy URL
+        return parent_directory + "/" + directory
+
+    @reify
+    def edit_path(self):
+        return self.path.relative_to(self.root.path) / "info.yml"
+
+    def is_link(self):
+        return isinstance(self, CourseLink)
+
+
+class Course(CourseMixin, Model):
     """A course – ordered collection of sessions"""
     def __str__(self):
         return '{} - {}'.format(self.slug, self.title)
@@ -372,20 +395,15 @@ class Course(Model):
 
     canonical = DataProperty(info, default=False)
 
+    COURSE_INFO = ["title", "description"]
+    RUN_INFO = ["title", "description", "start_date", "end_date", "subtitle"]
+
     @reify
     def base_course(self):
         name = self.info.get('derives')
         if name is None:
             return None
         return self.root.courses[name]
-
-    @reify
-    def slug(self):
-        directory = self.path.parts[-1]
-        parent_directory = self.path.parts[-2]
-        if parent_directory == "courses":
-            parent_directory = "course" # legacy URL
-        return parent_directory + "/" + directory
 
     @reify
     def sessions(self):
@@ -404,12 +422,62 @@ class Course(Model):
         return max(s.date for s in self.sessions.values() if s.date is not None)
 
 
+class CourseLink(CourseMixin, Model):
+    """ A link to a course from a separete git repo
+    """
+
+    link = YamlProperty()
+    repo = DataProperty(link)
+    branch = DataProperty(link)
+
+    info = ForkProperty(repo, branch, function_call="naucse.utils.course_info",
+                        args=lambda instance: [instance.slug],
+                        imports=["naucse.utils"])
+    title = DataProperty(info)
+    description = DataProperty(info)
+    start_date = DataProperty(info, convert=lambda x: datetime.strptime(x, "%Y-%m-%d").date())
+    end_date = DataProperty(info, convert=lambda x: datetime.strptime(x, "%Y-%m-%d").date())
+    subtitle = DataProperty(info, default=None)
+
+    def __str__(self):
+        return '{} - {}'.format(self.slug, self.title)
+
+    def render(self, page_type, *args):
+        task = Task(
+            "naucse.utils.render",
+            args=[page_type, self.slug] + list(args),
+            imports=["naucse.utils"]
+        )
+        result = arca.run(self.repo, self.branch, task)
+
+        try:
+            logging.error(result.error)
+        except AttributeError:
+            pass
+
+        return result.result
+
+    def render_course(self):
+        return self.render("course")
+
+    def render_page(self, lesson, page, solution):
+        return self.render("course_page", lesson.slug, page, solution)
+
+    def render_session_coverpage(self, session, coverpage):
+        return self.render("session_coverpage", session, coverpage)
+
+    def lesson_static(self, lesson, path):
+        filename = arca.static_filename(self.repo, self.branch, lesson.relative_path / "static" / path).resolve()
+
+        return filename.parent, filename.name
+
+
 class RunYear(Model):
     """A year of runs"""
     def __str__(self):
         return self.path.parts[-1]
 
-    runs = DirProperty(Course)
+    runs = MultipleModelDirProperty({"info.yml": Course, "link.yml": CourseLink})
 
 
 class License(Model):
@@ -428,7 +496,7 @@ class Root(Model):
         super().__init__(self, path)
 
     collections = DirProperty(Collection, 'lessons')
-    courses = DirProperty(Course, 'courses')
+    courses = MultipleModelDirProperty({"info.yml": Course, "link.yml": CourseLink}, 'courses')
     run_years = DirProperty(RunYear, 'runs', keyfunc=int)
     licenses = DirProperty(License, 'licenses')
     courses_edit_path = Path("courses")

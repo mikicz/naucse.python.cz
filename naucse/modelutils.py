@@ -1,9 +1,12 @@
+import logging
 from collections import OrderedDict
 from pathlib import Path
 import sys
 
 import yaml
+from arca import Task, Arca, VenvBackend
 
+arca = Arca(VenvBackend(verbosity=2))
 
 NOTHING = object()
 
@@ -12,6 +15,7 @@ class Model:
     def __init__(self, root, path):
         self.root = root
         self.path = Path(path)
+        self.relative_path = self.path.relative_to(Path.cwd())
 
     def __str__(self):
         return '0x{:x}'.format(id(self))
@@ -59,15 +63,51 @@ class YamlProperty(LazyProperty):
             return yaml.safe_load(f)
 
 
+class ForkProperty(LazyProperty):
+    """ Populated from the fork the model is pointing to.
+
+    ``repo`` and ``branch`` indicate from which attribute of the instance the property should take info about the fork.
+    ``**kwargs`` are for `arca.Task` - the values can be callable (they get instance as a parameter)
+    """
+    def __init__(self, repo, branch, **kwargs):
+        self.repo_prop = repo
+        self.branch_prop = branch
+        self.kwargs = kwargs
+
+    def process_kwargs(self, instance):
+        x = {}
+
+        for key, value in self.kwargs.items():
+            if callable(value):
+                value = value(instance)
+
+            x[key] = value
+
+        return x
+
+    def compute(self, instance):
+        task = Task(**self.process_kwargs(instance))
+
+        result = arca.run(getattr(instance, self.repo_prop.name), getattr(instance, self.branch_prop.name), task)
+
+        try:
+            logging.error(result.error)
+        except AttributeError:
+            pass
+
+        return result.result
+
+
 class DataProperty:
-    """Value retreived from a YamlProperty
+    """Value retrieved from a YamlProperty
 
     If ``key`` is not given, this property's name is used.
     """
-    def __init__(self, dict_prop, *, key=NOTHING, default=NOTHING):
+    def __init__(self, dict_prop, *, key=NOTHING, default=NOTHING, convert=NOTHING):
         self.dict_prop = dict_prop
         self.key = key
         self.default = default
+        self.convert = convert
 
     def __set_name__(self, cls, name):
         self.name = name
@@ -80,9 +120,14 @@ class DataProperty:
             key = self.name
         info = getattr(instance, self.dict_prop.name)
         if self.default is NOTHING:
-            return info[key]
+            val = info[key]
         else:
-            return info.get(key, self.default)
+            val = info.get(key, self.default)
+
+        if self.convert is NOTHING:
+            return val
+
+        return self.convert(val)
 
 
 class DirProperty(LazyProperty):
@@ -96,20 +141,65 @@ class DirProperty(LazyProperty):
         self.subdir = subdir
         self.keyfunc = keyfunc
 
-    def compute(self, instance):
-        base = instance.path.joinpath(*self.subdir)
-        
+    def get_ordered_paths(self, base):
         model_paths = []
+
         info_path = base.joinpath("info.yml")
         if info_path.is_file():
             with info_path.open(encoding='utf-8') as f:
                 model_paths = [base.joinpath(p) for p in yaml.safe_load(f)['order']]
+
+        remaining_subdirectories = [p for p in sorted(base.iterdir()) if p.is_dir() if p not in model_paths]
+
+        return model_paths + remaining_subdirectories
+
+    def compute(self, instance):
+        base = instance.path.joinpath(*self.subdir)
         
-        subdirectories = [p for p in sorted(base.iterdir()) if p.is_dir()]
+        paths = self.get_ordered_paths(base)
+
         return OrderedDict(
             (self.keyfunc(p.parts[-1]), self.cls(instance.root, p))
-            for p in model_paths + subdirectories
+            for p in paths
         )
+
+
+class MultipleModelDirProperty(DirProperty):
+    """ Ordered dict of models from a subdirectory
+
+    Possible to order by ``info.yml`` just like DirProperty
+    """
+    def __init__(self, file_definition, *subdir, keyfunc=str):
+        self.file_definition = file_definition
+        super().__init__(file_definition.values(), *subdir, keyfunc=keyfunc)
+
+    def compute(self, instance):
+        base = instance.path.joinpath(*self.subdir)
+
+        paths = self.get_ordered_paths(base)
+
+        models = []
+
+        for path in paths:  # type: Path
+            cls = None
+            for fl in path.iterdir():  # type: Path
+                if not fl.is_file():
+                    continue
+
+                local_cls = self.file_definition.get(fl.name)
+                if local_cls is not None:
+                    if cls is not None:
+                        raise ValueError(f"There are multiple definition files in {path.resolve()}")
+                    cls = local_cls
+
+            if cls is None:
+                raise ValueError(f"There are no definition files in {path.resolve()}")
+
+            models.append(
+                (self.keyfunc(path.parts[-1]), cls(instance.root, path))
+            )
+
+        return OrderedDict(models)
 
 
 class reify(LazyProperty):
