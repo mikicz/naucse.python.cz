@@ -7,6 +7,7 @@ import yaml
 from arca import Task, Arca
 
 arca = Arca(settings={"ARCA_BACKEND_VERBOSITY": 2,
+                      "ARCA_BACKEND_SINGLE_PULL": True,
                       "ARCA_CACHE_BACKEND": "dogpile.cache.memory"})
 
 NOTHING = object()
