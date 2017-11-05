@@ -4,6 +4,7 @@ from datetime import datetime
 
 import jinja2
 from arca import Task
+from flask import make_response
 
 from naucse.modelutils import Model, YamlProperty, DataProperty, DirProperty, MultipleModelDirProperty, ForkProperty
 from naucse.modelutils import reify, arca
@@ -451,7 +452,9 @@ class CourseLink(CourseMixin, Model):
         except AttributeError:
             pass
 
-        return result.result
+        response = make_response(result.result)
+        response.headers["X-RENDERED-FROM-ARCA"] = ""
+        return response
 
     def render_course(self):
         return self.render("course")

@@ -12,3 +12,4 @@ pygments
 traitlets
 werkzeug
 git+ssh://git@github.com/mikicz/arca.git#egg=arca
+beautifulsoup4

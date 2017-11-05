@@ -2,6 +2,8 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
+from naucse.freezer import NaucseFreezer
+
 if sys.version_info[0] <3 :
     raise RuntimeError('We love Python 3.')
 
@@ -19,4 +21,4 @@ def main():
     logger = logging.getLogger("arca")
     logger.addHandler(handler)
 
-    cli(app, base_url='http://naucse.python.cz')
+    cli(app, base_url='http://naucse.python.cz', freezer=NaucseFreezer(app))
