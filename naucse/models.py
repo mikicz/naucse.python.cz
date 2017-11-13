@@ -458,7 +458,12 @@ class CourseLink(CourseMixin, Model):
         except AttributeError:
             pass
 
-        response = make_response(result.result)
+        try:
+            response = make_response(result.result)
+        except AttributeError as e:
+            logging.exception(e)
+            raise
+
         response.headers["X-RENDERED-FROM-ARCA"] = ""
         return response
 
