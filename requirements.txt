@@ -11,5 +11,5 @@ nbconvert
 pygments
 traitlets
 werkzeug
-git+ssh://git@github.com/mikicz/arca.git#egg=arca
+git+ssh://git@github.com/mikicz/arca.git@docker_backend#egg=arca
 beautifulsoup4
