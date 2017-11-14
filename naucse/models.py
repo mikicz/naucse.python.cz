@@ -472,6 +472,9 @@ class CourseLink(CourseMixin, Model):
     def render_course(self):
         return self.render("course")
 
+    def render_calendar(self):
+        return self.render("calendar")
+
     def render_page(self, lesson, page, solution):
         return self.render("course_page", lesson.slug, page, solution)
 

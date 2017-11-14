@@ -51,6 +51,9 @@ def render(page_type: str, slug: str, *args, **kwargs) -> str:
         if page_type == "course":
             return routes.course(course)
 
+        if page_type == "calendar":
+            return routes.course_calendar(course)
+
         if page_type == "course_page":
             lesson_slug, page, solution, *_ = args
             return routes.course_page(course, routes.model.get_lesson(lesson_slug), page, solution)

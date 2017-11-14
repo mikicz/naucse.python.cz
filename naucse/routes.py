@@ -330,6 +330,10 @@ def list_months(start_date, end_date):
 def course_calendar(course):
     if not course.start_date:
         abort(404)
+
+    if course.is_link():
+        return course.render_calendar()
+
     sessions_by_date = {s.date: s for s in course.sessions.values()}
     return render_template('course_calendar.html',
                            edit_path=course.edit_path,
