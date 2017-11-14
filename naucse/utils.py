@@ -1,15 +1,13 @@
 from typing import Any, Dict
 from datetime import date, datetime, time
 
-import os
+from . import routes
+from .models import Course
 
 
-
-def get_course_from_slug(slug: str):
+def get_course_from_slug(slug: str) -> Course:
     """ Gets the actual course instance from a slug.
     """
-    from . import routes
-
     parts = slug.split("/")
 
     if parts[0] == "course":
@@ -21,8 +19,6 @@ def get_course_from_slug(slug: str):
 def course_info(slug: str, *args, **kwargs) -> Dict[str, Any]:
     """ Returns info about the course/run. Returns some extra info when it's a run (based on COURSE_INFO/RUN_INFO)
     """
-    from .models import Course
-
     course = get_course_from_slug(slug)
     if "course" in slug:
         attributes = Course.COURSE_INFO
@@ -45,13 +41,6 @@ def course_info(slug: str, *args, **kwargs) -> Dict[str, Any]:
 def render(page_type: str, slug: str, *args, **kwargs) -> str:
     """ Returns a rendered page for a course, based on page_type and slug.
     """
-
-    # docker is not running in the docker - we don't need the backend here
-    # lets set it to a dummy backed without a check that would fail
-    os.environ["ARCA_BACKEND"] = "arca.backend.VenvBackend"
-
-    from . import routes
-
     course = get_course_from_slug(slug)
 
     if course.is_link():
