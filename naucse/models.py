@@ -395,7 +395,11 @@ class Course(CourseMixin, Model):
     canonical = DataProperty(info, default=False)
 
     COURSE_INFO = ["title", "description"]
-    RUN_INFO = ["title", "description", "start_date", "end_date", "subtitle"]
+    RUN_INFO = ["title", "description", "start_date", "end_date", "subtitle", "derives"]
+
+    @property
+    def derives(self):
+        return self.info.get("derives")
 
     @reify
     def base_course(self):
@@ -443,9 +447,17 @@ class CourseLink(CourseMixin, Model):
     start_date = DataProperty(info, convert=lambda x: datetime.strptime(x, "%Y-%m-%d").date())
     end_date = DataProperty(info, convert=lambda x: datetime.strptime(x, "%Y-%m-%d").date())
     subtitle = DataProperty(info, default=None)
+    derives = DataProperty(info, default=None)
 
     def __str__(self):
         return '{} - {}'.format(self.slug, self.title)
+
+    @reify
+    def base_course(self):
+        name = self.derives
+        if name is None:
+            return None
+        return self.root.courses[name]
 
     def render(self, page_type, *args):
         task = Task(
