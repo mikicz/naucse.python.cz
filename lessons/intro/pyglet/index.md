@@ -249,7 +249,7 @@ pyglet.app.run()
 ```
 
 
-Co to dělá? `pyglet.clock.schedule_interval(tik, 30)`
+Co to dělá? `pyglet.clock.schedule_interval(tik, 1/30)`
 řekne Pygletu, že má zavolat funkci `tik` každou
 třicetinu (`1/30`) vteřiny.
 
@@ -282,6 +282,8 @@ Najdi si na Internetu nějaký obrázek. Ne moc velký,
 tak 3cm, ať je kolem něj v našem černém okýnku dost
 místa, a nejlépe ve formátu PNG. Začni třeba na
 [téhle stránce](https://www.google.cz/search?tbs=ift:png&tbm=isch&q=snake+icon).
+Ale nevybírej obrázek, který je celý černý, protože by v našem černém okně
+nebyl vidět.
 Ulož si ho do adresáře, odkud spouštíš svůj pythonní
 program. Já mám třeba obrázek hada v souboru `had.png`.
 
@@ -519,11 +521,7 @@ pyglet.app.run()
 Se vstupem z klávesnice a myši, časováním a vykreslováním
 Spritu si vystačíš u leckteré hry nebo grafické aplikace.
 
-To, co jsme tu probral{{gnd('i', 'y', both='i')}} a pár věcí navíc,
-je shrnuto v [taháku na Pyglet](https://github.com/pyvec/cheatsheets/raw/master/pyglet/pyglet-basics-cs.pdf),
-který si můžeš stáhnout a vytisknout.
-
-Až budeš nějakou dělat, zkus udržovat
+Až budeš nějakou hru dělat, zkus udržovat
 stav aplikace v seznamech a <var>n</var>-ticích (případně
 slovnících a třídách, které se naučíme později).
 Jedna funkce by měla umět takový stav vykreslit a
@@ -540,6 +538,10 @@ Na první pohled může její kód vypadat složitě,
 ale zkus si k němu sednout a s pomocí komentářů ho pochopit.
 Kdyby komentáře nestačily, jsou k Pongu připravené
 i [podrobné materiály]({{ lesson_url('projects/pong') }}).
+
+To, co jsme tu probral{{gnd('i', 'y', both='i')}} a pár věcí navíc,
+je shrnuto v [taháku na Pyglet](https://github.com/pyvec/cheatsheets/raw/master/pyglet/pyglet-basics-cs.pdf),
+který si můžeš stáhnout a vytisknout.
 
 A chceš-li se do Pygletu ponořit hlouběji,
 existuje pro něj [dokumentace](http://pyglet.readthedocs.org/en/latest/index.html).

@@ -115,13 +115,13 @@ if not (a == b):
 ## Spouštění testů
 
 Testy se spouští zadáním příkazu
-`python -m pytest -v`,
-tedy v překladu: <strong>Python</strong>e, pusť
+`python -m pytest -v` následovaným názvem souboru s testy.
+Tedy v překladu: <strong>Python</strong>e, pusť
 <strong>m</strong>odul <strong>pytest</strong>,
-v „ukecaném” režimu (angl. <strong>v</strong>erbose).
+v „ukecaném” režimu (angl. <strong>v</strong>erbose) nad zadaným souborem.
 
 ```ansi
-$ python -m pytest -v test_secteni.py 
+$ python -m pytest -v test_secteni.py
 ␛[1m============= test session starts =============␛[0m
 platform linux -- Python 3.6.0, pytest-3.0.6, py-1.4.32, pluggy-0.4.0 -- env/bin/python
 cachedir: .cache
@@ -133,13 +133,18 @@ test_secteni.py::test_secti ␛[32mPASSED␛[0m
 ␛[32m============= 1 passed in 0.00 seconds =============␛[0m
 ```
 
-Tento příkaz projde všechny soubory v aktuálním
-adresáři, jejichž jméno začíná na `test_`, zavolá v nich všechny funkce,
+Tento příkaz projde zadaný soubor, zavolá v něm všechny funkce,
 jejichž jméno začíná na `test_`, a ověří, že nevyvolají žádnou
-výjimku — typicky výjimku z příkazu `assert`.
+výjimku – typicky výjimku z příkazu `assert`.
 Pokud výjimka nastane, dá to `pytest` velice červeně
 najevo a přidá několik informací, které můžou
 usnadnit nalezení a opravu chyby.
+
+> [note]
+> Argument s názvem souboru můžeme vynechat: `python -m pytest -v`
+> V takovém případě `pytest` projde aktuální adresář a spustí testy
+> ze všech souborů, jejichž jméno začíná na `test_`. Místo souboru
+> lze též uvést adresář a `pytest` vyhledá testy v něm.
 
 Zkus si změnit funkci `secti` (nebo její test) a podívat se,
 jak to vypadá když test „neprojde“.
