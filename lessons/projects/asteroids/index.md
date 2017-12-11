@@ -35,11 +35,11 @@ První krok bude naprogramovat vesmírnou loď, která půjde ovládat klávesni
 
 * Vesmírnou loď bude reprezentovat objekt třídy `Spaceship`.
 * Každá loď má vlastní atributy `x` a `y` (pozice),
-  `x_speed` a `y_speed` (rychlost), `rotation` (úhel natočení),
-  `sprite` (obrázek pro Pyglet) a `window` (okno, ve kterém se hraje).
+  `x_speed` a `y_speed` (rychlost), `rotation` (úhel natočení) a
+  `sprite` (2D objekt v Pygletu s polohou, rotací a obrázkem).
 * Loď má metodu `tick`, která obstarává
   mechaniku týkající se lodi – posouvání, natáčení a ovládání.
-* Všechny objekty ve hře si budeme dávat do seznamu `objects`.
+* Všechny objekty ve hře si budeme dávat do globálního seznamu `objects`.
   Zatím tam bude jenom vesmírná loď.
 * Co se ovládání týče, stisknuté klávesy si uchovávej v *množině* (angl. `set`),
   což je datový typ podobný seznamu, jen nemá dané pořadí
@@ -62,41 +62,77 @@ První krok bude naprogramovat vesmírnou loď, která půjde ovládat klávesni
   Do „batche” jde přidávat pomocí argumentu při vytváření `Sprite()`
   a odebírat pomocí `sprite.delete()`. Například:
 
-    ```python
-    batch = pyglet.graphics.Batch()
-    sprite1 = pyglet.sprite.Sprite(obrazek, batch=batch)
-    sprite2 = pyglet.sprite.Sprite(obrazek, batch=batch)
+  ```python
+  batch = pyglet.graphics.Batch()
+  sprite1 = pyglet.sprite.Sprite(obrazek, batch=batch)
+  sprite2 = pyglet.sprite.Sprite(obrazek, batch=batch)
 
-    # a potom můžeš vykreslit všechny najednou:
-    batch.draw()
-    ```
+  # a potom můžeš vykreslit všechny najednou:
+  batch.draw()
+  ```
 
-* Základní pohyb raketky je jednoduchý: k x-ové
-  souřadnici se přičte x-ová rychlost krát uplynulý čas
-  a to samé v y-ové souřadnici i pro úhel otočení:
+  Kolekci `batch` si stejně jako `objects` uchovávej globálně.
+* Aby se objekty hýbaly a otáčely podle svých středů, je dobré nastavit „kotvu“
+  obrázku na jeho střed (jinak je kotva v levém dolním rohu):
 
-    ```python
-    self.x = self.x + dt * self.x_speed
-    self.y = self.y + dt * self.y_speed
-    self.rotation = self.rotation + dt * rotation_speed
-    ```
+  ```python
+  image = pyglet.image.load(...)
+  image.anchor_x = image.width // 2
+  image.anchor_y = image.height // 2
+  self.sprite = pyglet.sprite.Sprite(image, batch=batch)
+  ```
+* Pro pohyb raketky půjde použít klávesy s šipkami doleva, doprava a rovně.
+  Šipky do stran raketu točí, šipka dopředu zrychluje pohyb tím směrem, kam je
+  raketka otočená.
+  * Základní pohyb raketky je jednoduchý: k <var>x</var>-ové
+    souřadnici se přičte <var>x</var>-ová rychlost krát uplynulý čas
+    a to samé v <var>y</var>-ové souřadnici i pro úhel otočení:
 
-    Rychlost otáčení závisí na stisknutých šipkách (doleva nebo doprava).
+      ```python
+      self.x = self.x + dt * self.x_speed
+      self.y = self.y + dt * self.y_speed
+      self.rotation = self.rotation + dt * rotation_speed
+      ```
 
-* Zrychlení je trochu složitější: k x-ové rychlosti
-  se přičte kosinus úhlu otočení krát uplynulý čas.
-  U y-ové osy se použije sinus.
-  Je ale potřeba převést úhel na radiány, protože
-  Pyglet (a naše hra) používá stupně:
+      Rychlost otáčení závisí na stisknutých šipkách (doleva nebo doprava).
+      V jednom případě je záporná, v druhém kladná. Vhodnou hodnotu zvol
+      experimentováním – začni třeba u 4 radiánů za sekundu.
+      Všechny podobné „magické hodnoty“ je vhodné definovat
+      jako konstanty – tedy proměnné, které na začátku nastavíš a nikdy
+      je neměníš. Bývá zvykem je označovat velkými písmeny a dávat je na
+      začátek souboru, hned za importy:
 
-    ```python
-    rotation_radians = math.radians(self.rotation)
-    self.x_speed += dt * ACCELERATION * math.cos(rotation_radians)
-    self.y_speed += dt * ACCELERATION * math.sin(rotation_radians)
-    ```
-* Když raketka vyletí z okýnka ven, vrať
-  ji zpátky do hry na druhé straně okýnka.
-  (Zkontroluj si, že to funguje na všech čtyřech stranách.)
+      ```python
+      ROTATION_SPEED = 4  # radians per second
+      ```
+  * Zrychlení je trochu složitější: k  <var>x</var>-ové rychlosti
+    se přičte kosinus úhlu otočení krát uplynulý čas.
+    U <var>y</var>-ové osy se použije sinus.
+
+      ```python
+      self.x_speed += dt * ACCELERATION * math.cos(self.rotation)
+      self.y_speed += dt * ACCELERATION * math.sin(self.rotation)
+      ```
+
+      Všimni si v příkladu konstanty `ACCELERATION`. Tu opět zvol podle uvážení.
+  * Když máš hodnoty `self.x`, `self.y` a `self.rotation` spočítané, nezapomeň
+    je promítnout do `self.sprite`, jinak se nic zajímavého nestane.
+
+    Pozor na to, že funkce `math.sin` a `math.cos` používají radiány,
+    kdežto `pyglet` používá pro `Sprite.rotation` stupně.
+    (A k tomu je navíc 0° jinde, a otáčí se na opačnou stranu.)
+    Pro sprite je tedy potřeba úhel převést:
+
+      ```python
+      self.sprite.rotation = 90 - math.degrees(self.rotation)
+      self.sprite.x = self.x
+      self.sprite.y = self.y
+      ```
+  * Když raketka vyletí z okýnka ven, vrať
+    ji zpátky do hry na druhé straně okýnka.
+    (Zkontroluj si, že to funguje na všech čtyřech stranách.)
+
+
 * **Bonus 1**: Zkus si přidat několik raketek,
   každou trochu jinak natočenou.
 
@@ -104,7 +140,7 @@ První krok bude naprogramovat vesmírnou loď, která půjde ovládat klávesni
   si udržuje vlastní stav, takže by nemělo být složité
   jich vytvořit víc (a všechny ovládat najednou).
 * **Bonus 2**:
-  Možná sis všiml{{a}} „skoku” když
+  Možná sis všiml{{a}} „skoku”, když
   raketa vyletí z okýnka a vrátí se na druhé straně.
   Tomu se dá zabránit tak, že
   vlevo, vpravo, nahoře i dole vedle naší „scény”
@@ -135,7 +171,6 @@ První krok bude naprogramovat vesmírnou loď, která půjde ovládat klávesni
               gl.glPopMatrix()
   ```
   Pro přehled, dokumentace k použitým funkcím je tady:
-
   [glPushMatrix, glPopMatrix](https://www.opengl.org/sdk/docs/man2/xhtml/glPushMatrix.xml),
   [glTranslatef](https://www.opengl.org/sdk/docs/man2/xhtml/glTranslate.xml).
 
@@ -152,7 +187,7 @@ Přidej druhý typ vesmírného objektu: `Asteroid`.
 
 * Asteroidy a vesmírné lodě mají mnoho společného:
   každý takový vesmírný objekt bude mít polohu,
-  rychlost, natočení a pravidla jak se pohybuje.
+  rychlost, natočení a pravidla, jak se pohybuje.
   Vytvoř proto třídu `SpaceObject`,
   ve které bude všechno to společné, a z ní poděď
   třídu `Spaceship`, ve které zůstane
@@ -167,15 +202,14 @@ Přidej druhý typ vesmírného objektu: `Asteroid`.
 * Napiš ještě třídu `Asteroid`,
   která taky dědí ze `SpaceObject`,
   ale má svoje vlastní chování:
-  může mít jednu ze čtyř velikostí,
-  začíná buď na levé nebo spodní straně obrazovky*
+  začíná buď na levé nebo spodní straně obrazovky
   s náhodnou rychlostí
   a ke každému asteroidu se přiřadí
   náhodně vybraný obrázek.
   (V Asteroidech je levý a pravý okraj v podstatě
     to samé; a stejně tak horní a spodní.)
 * A pak pár asterojdíků různých velikostí přidej
-  na začátku hry do `objects`.
+  na začátku do hry.
 
 Povedlo se? Máš dva typy objektů?
 Čas to všechno dát do Gitu!
@@ -192,7 +226,7 @@ Naše asteroidy jsou zatím docela neškodné. Pojďme to změnit.
 * V této sekci bude tvým úkolem zjistit, kdy
   loď narazila do asteroidu.
   Pro zjednodušení si každý objekt nahradíme
-  kolečkem a budeme počítat kdy se srazí kolečka.
+  kolečkem a budeme počítat, kdy se srazí kolečka.
   Každý objekt bude potřebovat mít poloměr – atribut `radius`.
 * Aby bylo vidět co si hra o objektech „myslí”,
   nakresli si nad každým objektem příslušné kolečko.
@@ -200,6 +234,7 @@ Naše asteroidy jsou zatím docela neškodné. Pojďme to změnit.
   [pyglet.gl](http://pyglet.readthedocs.org/en/latest/programming_guide/gl.html)
   a trochy matematiky; pro teď si jen opiš funkci
   `draw_circle` a pro každý objekt ji zavolej.
+  Až to bude všechno fungovat, můžeš funkci dát pryč.
 
   ```python
   def draw_circle(x, y, radius):
@@ -226,7 +261,7 @@ Naše asteroidy jsou zatím docela neškodné. Pojďme to změnit.
   V rámci `Spaceship.tick` projdi
   každý objekt, zjisti jestli vzdálenost mezi lodí
   a objektem je menší než součet poloměrů
-  (t.j. narazily do sebe) a pokud jo,
+  (t.j. narazily do sebe) a pokud ano,
   zavolej na objektu metodu `hit_by_spaceship`.
 
   Zjišťování vzdálenosti ve hře, kde se
@@ -235,7 +270,7 @@ Naše asteroidy jsou zatím docela neškodné. Pojďme to změnit.
 
   ```python
   def distance(a, b, wrap_size):
-     """Distance in one direction (x or y)"""
+      """Distance in one direction (x or y)"""
       result = abs(a - b)
       if result > wrap_size / 2:
           result = wrap_size - result
@@ -256,6 +291,10 @@ Naše asteroidy jsou zatím docela neškodné. Pojďme to změnit.
   Jen asteroid loď rozbije, takže předefinuj
   `Asteroid.hit_by_spaceship`, aby
   zavolala `delete` lodi.
+
+  Protože lodí může být v naší hře obecně více, musí asteroid
+  vědět, se kterou lodí se srazil, aby ji mohl rozbít.
+  Metoda `hit_by_spaceship` by tedy na to měla mít argument.
 
 Povedlo se? Konečně se dá prohrát?
 Čas to všechno zkontrolovat, dát do Gitu a můžeme pokračovat!
@@ -289,7 +328,7 @@ Teď zkusíme asteroidy rozbíjet.
   rozdělí na dva menší (nebo, je-li už příliš malý, zmizí úplně).
 
   Rychlosti nových asteroidů si můžeš nastavit
-  podle sebe – důležité je jen aby každý menší
+  podle sebe – důležité je jen, aby každý menší
   asteroid letěl jinam.
   Většinou bývají nové asteroidy rychlejší než ten původní.
 * A to je vše! Máš funkční hru!
@@ -320,7 +359,7 @@ vlastní rozšíření!
 
   **Bonus:** Několik vteřin po
   „restartu” může být raketka nezničitelná,
-  aby měla čas odletět když je zrovna uprostřed
+  aby měla čas odletět, když je zrovna uprostřed
   okýnka asteroid.
 * Je hra příliš lehká?
 
@@ -353,13 +392,13 @@ vlastní rozšíření!
   Doporučuji si na efekty udělat nový `Batch`
   a vykreslit ho před tím hlavním, aby efekty
   nepřekrývaly herní objekty.
-* Nepoznáš kdy jsi prohrál{{a}}?
+* Nepoznáš, kdy jsi prohrál{{a}} nebo vyhrál{{a}}?
 
-  Na konci můžeš ukázat veliký nápis GAME OVER.
+  Na konci můžeš ukázat veliký nápis GAME OVER nebo WINNER.
 * Nudíš se?
 
   V původní hře se občas objeví UFO, které občas
-  vystřelí na místo kde je právě hráčova raketka,
+  vystřelí na místo, kde je právě hráčova raketka,
   takže pokud hráč stojí pořád na jednom místě a
   jenom se točí dokola, UFO ho sestřelí.
   Můžeš zkusit dodělat třídu `Ufo`
