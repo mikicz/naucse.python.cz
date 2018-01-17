@@ -1,6 +1,7 @@
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from naucse.freezer import NaucseFreezer
 
@@ -12,7 +13,11 @@ from naucse.routes import app
 
 
 def main():
-    handler = RotatingFileHandler('.arca/arca.log', maxBytes=10000, backupCount=0)
+    log_path = Path(".arca/arca.log")
+    log_path.parent.mkdir(exist_ok=True)
+    log_path.touch()
+
+    handler = RotatingFileHandler(log_path, maxBytes=10000, backupCount=0)
     formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
 
     handler.setLevel(logging.INFO)
