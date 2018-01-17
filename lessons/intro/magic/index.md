@@ -9,7 +9,7 @@ Návrh jazyka (a knihoven pro něj) se řídí mimo jiné poučkou „There shou
 Existuje ideálně jeden *zjevně nejlepší* způsob, jak dosáhnout určité funkčnosti.
 Úkolem programátora je tento způsob najít a použít. Náš cíl by měl být kód, který ostatní programátoři pochopí na první pohled. A pokud je to možné, měli by ho pochopit i neprogramátoři. Není mezi nimi pevná hranice – váš kód můžou číst lidi, kteří programovací jazyk v životě neviděli; programátoři silní v jiných jazycích; průměrní Pythonisté; nebo ostřílení veteráni. Čím víc jich dokáže kód pochopit, tím bude váš kód udržovatelnější.
 
-S tím souvisí koncept „magie“. Magie je něco, co funguje, ačkoli tomu nerozumíme. Pro každého čtenář kódu může být magie něco jiného: pro začátečníka bude nepochopitelný zápis `zip(*args)`, matematik nemusí chápat princip dědičnosti tříd, ostřílený Pythonista nemusí chápat maticovou matematiku, neprogramátor netuší, jak funguje mobil nebo webová aplikace. Je to tedy subjektivní pojem, ale lze ho zobjektivnit: čím méně lidí váš kód pochopí, tím je kód magičtější.
+S tím souvisí koncept „magie“. Magie je něco, co funguje, ačkoli tomu nerozumíme. Pro každého čtenáře kódu může být magie něco jiného: pro začátečníka bude nepochopitelný zápis `zip(*args)`, matematik nemusí chápat princip dědičnosti tříd, ostřílený Pythonista nemusí chápat maticovou matematiku, neprogramátor netuší, jak funguje mobil nebo webová aplikace. Je to tedy subjektivní pojem, ale lze ho zobjektivnit: čím méně lidí váš kód pochopí, tím je kód magičtější.
 
 Magie, která *funguje*, nevadí. Věci které nechápu, můžu stále používat – jen nevím jak fungují, a tudíž je neumím *opravit*. Problém nastane až v momentě, kdy se něco pokazí.
 
@@ -486,7 +486,7 @@ Funguje podobně jako `@property`, jen se výsledek vypočítá pouze jednou a u
 Při dalším přístupu k atributu už se použije uložená hodnota.
 
 ```python
-class reify(object):
+class reify:
     def __init__(self, func):
         self.func = func
 
@@ -655,6 +655,7 @@ class IterableMeta(type):
     def __init__(cls, name, bases, namespace):
         cls.items = sorted(n for n in namespace
                            if not n.startswith('__'))
+        super().__init__(name, bases, namespace)
 
     def __iter__(cls):
         return iter(cls.items)
@@ -703,11 +704,12 @@ existuje, zavolá pro vytvoření jmenného prostoru:
 from collections import OrderedDict
 
 class OrderRememberingMeta(type):
-    def __prepare__(self, name):
+    def __prepare__(cls, name):
         return OrderedDict()
 
     def __init__(cls, name, bases, namespace):
         cls.items = list(namespace)
+        super().__init__(name, bases, namespace)
 
     def __iter__(cls):
         return iter(cls.items)
