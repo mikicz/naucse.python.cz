@@ -8,7 +8,7 @@ from arca import Task, Arca
 
 arca = Arca(settings={"ARCA_BACKEND": "arca.backend.DockerBackend",
                       "ARCA_BACKEND_VERBOSITY": 2,
-                      "ARCA_BACKEND_SINGLE_PULL": True,
+                      "ARCA_SINGLE_PULL": True,
                       "ARCA_DOCKER_BACKEND_KEEP_CONTAINER_RUNNING": True,
                       "ARCA_CACHE_BACKEND": "dogpile.cache.memory"})
 
