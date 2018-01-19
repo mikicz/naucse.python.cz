@@ -1,9 +1,10 @@
 {% extends "_base_course.html" %}
 
 {% block breadcrumbs %}
-> {{ course.title }}
+> <a href="{{ course_url }}">{{ course_title }}</a>
+> {{ session_title }}
 {% endblock %}
 
 {% block course_content %}
-  {% include "content/course.html" %}
+  {{ content|safe }}
 {% endblock %}

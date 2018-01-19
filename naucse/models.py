@@ -432,7 +432,7 @@ class Course(CourseMixin, Model):
 
 
 class CourseLink(CourseMixin, Model):
-    """ A link to a course from a separete git repo
+    """ A link to a course from a separate git repo
     """
 
     link = YamlProperty()
@@ -472,14 +472,7 @@ class CourseLink(CourseMixin, Model):
         except AttributeError:
             pass
 
-        try:
-            response = make_response(result.result)
-        except AttributeError as e:
-            logging.exception(e)
-            raise
-
-        response.headers["X-RENDERED-FROM-ARCA"] = ""
-        return response
+        return result.result
 
     def render_course(self):
         return self.render("course")

@@ -11,15 +11,15 @@
 {% endblock %}
 
 {% block breadcrumbs %}
-> <a href="{{ course_url(course) }}">{{ course.title }}</a>
-{% if session %}
-> <a href="{{ session_url(course.slug, session.slug) }}">{{ session.title }}</a>
+> <a href="{{ course_url }}">{{ course_title }}</a>
+{% if session_title %}
+> <a href="{{ session_url }}">{{ session_title }}</a>
 {% endif %}
 > {{ page.title }}
 {% endblock %}
 
 {% block course_content %}
 
-  {% include "content/lesson.html" %}
+  {{ content|safe }}
 
 {% endblock %}

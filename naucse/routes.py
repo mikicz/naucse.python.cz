@@ -2,7 +2,7 @@ import os
 import datetime
 import calendar
 
-from flask import Flask, render_template, url_for, send_from_directory
+from flask import Flask, render_template, url_for, send_from_directory, make_response
 from flask import abort
 from jinja2 import StrictUndefined
 from jinja2.exceptions import TemplateNotFound
@@ -10,6 +10,7 @@ from werkzeug.local import LocalProxy
 from pathlib import Path
 
 from naucse import models
+from naucse.routes_util import get_recent_runs, PageLink, list_months
 from naucse.urlconverters import register_url_converters
 from naucse.templates import setup_jinja_env, vars_functions
 
@@ -116,43 +117,35 @@ def lesson_static(course, lesson, path):
     return send_from_directory(directory, filename)
 
 
-def get_recent_runs(course):
-    """Build a list of "recent" runs based on a course.
-
-    By recent we mean: haven't ended yet, or ended up to ~2 months ago
-    (Note: even if naucse is hosted dynamically,
-    it's still beneficial to show recently ended runs.)
-    """
-    recent_runs = []
-    if not course.start_date:
-        today = datetime.date.today()
-        cutoff = today - datetime.timedelta(days=2*30)
-        this_year = today.year
-        for year, run_year in reversed(course.root.run_years.items()):
-            for run in run_year.runs.values():
-                if run.base_course is course and run.end_date > cutoff:
-                    recent_runs.append(run)
-            if year < this_year:
-                # Assume no run lasts for more than a year,
-                # e.g. if it's Jan 2018, some run that started in 2017 may
-                # be included, but don't even look through runs from 2016
-                # or earlier.
-                break
-    recent_runs.sort(key=lambda r: r.start_date, reverse=True)
-    return recent_runs
-
-
 @app.route('/<course:course>/')
-def course(course):
+def course(course, content_only=False):
     if course.is_link():
-        return course.render_course()
+        data_from_fork = course.render_course()
+
+        try:
+            course = data_from_fork.get("course", {})
+
+            response = render_template(
+                "link/course_link.html",
+                title=course.get("title"),
+                course_title=course.get("title"),
+                coach_present=data_from_fork.get("coach_present"),
+                edit_url=data_from_fork.get("edit_url"),
+                content=data_from_fork.get("content"),
+            )
+            response = make_response(response)
+            response.headers["X-RENDERED-FROM-ARCA"] = ""
+
+            return response
+        except TemplateNotFound:
+            abort(404)
 
     def lesson_url(lesson, *args, **kwargs):
         return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
 
     try:
         return render_template(
-            'course.html',
+            'course.html' if not content_only else 'content/course.html',
             course=course,
             plan=course.sessions,
             title=course.title,
@@ -168,6 +161,7 @@ def render_page(page, solution=None, vars=None, **kwargs):
     lesson = page.lesson
 
     course = kwargs.get("course", None)
+    content_only = kwargs.get("content_only", False)
 
     def static_url(path):
         return url_for('lesson_static', lesson=lesson, path=path, course=course)
@@ -185,11 +179,10 @@ def render_page(page, solution=None, vars=None, **kwargs):
     kwargs.setdefault('page', page)
 
     if solution is not None:
-        template_name = 'solution.html'
+        template_name = 'solution.html' if not content_only else 'content/solution.html'
         kwargs.setdefault('solution_number', solution)
-
     else:
-        template_name = 'lesson.html'
+        template_name = 'lesson.html' if not content_only else 'content/lesson.html'
 
     kwargs.setdefault('title', page.title)
     kwargs.setdefault('content', content)
@@ -198,18 +191,10 @@ def render_page(page, solution=None, vars=None, **kwargs):
                            edit_path=page.edit_path)
 
 
-@app.route('/<course:course>/<lesson:lesson>/', defaults={'page': 'index'})
-@app.route('/<course:course>/<lesson:lesson>/<page>/')
-@app.route('/<course:course>/<lesson:lesson>/<page>/solutions/<int:solution>/')
-def course_page(course, lesson, page, solution=None):
-    """Render the html of the given lesson page in the course."""
-    if course.is_link():
-        return course.render_page(lesson, page, solution)
-
+def get_page(course, lesson, page):
     for session in course.sessions.values():
         for material in session.materials:
-            if (material.type == "page" and
-                    material.page.lesson.slug == lesson.slug):
+            if (material.type == "page" and material.page.lesson.slug == lesson.slug):
                 material = material.subpages[page]
                 page = material.page
                 nxt = material.next
@@ -222,6 +207,50 @@ def course_page(course, lesson, page, solution=None):
         page = lesson.pages[page]
         session = None
         prv = nxt = None
+
+    return page, session, prv, nxt
+
+
+@app.route('/<course:course>/<lesson:lesson>/', defaults={'page': 'index'})
+@app.route('/<course:course>/<lesson:lesson>/<page>/')
+@app.route('/<course:course>/<lesson:lesson>/<page>/solutions/<int:solution>/')
+def course_page(course, lesson, page, solution=None, content_only=False):
+    """Render the html of the given lesson page in the course."""
+    if course.is_link():
+        data_from_fork = course.render_page(lesson, page, solution)
+
+        try:
+            course = data_from_fork.get("course", {})
+            session = data_from_fork.get("session", {})
+            page = data_from_fork.get("page", {})
+
+            title = '{}: {}'.format(course.get("title"), page.get("title"))
+
+            response = render_template(
+                "link/lesson_link.html",
+                course_title=course.get("title"),
+                course_url=course.get("url"),
+                coach_present=data_from_fork.get("coach_present"),
+                title=title,
+
+                page=PageLink(page),
+
+                canonical_url=data_from_fork.get("canonical_url"),
+
+                session_title=session.get("title"),
+                session_url=session.get("url"),
+
+                edit_url=data_from_fork.get("edit_url"),
+                content=data_from_fork.get("content"),
+            )
+            response = make_response(response)
+            response.headers["X-RENDERED-FROM-ARCA"] = ""
+
+            return response
+        except TemplateNotFound:
+            abort(404)
+
+    page, session, prv, nxt = get_page(course, lesson, page)
 
     def lesson_url(lesson, *args, **kwargs):
         return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
@@ -241,7 +270,8 @@ def course_page(course, lesson, page, solution=None):
                        solution=solution,
                        vars=course.vars,
                        nxt=nxt, prv=prv,
-                       session=session)
+                       session=session,
+                       content_only=content_only)
 
 
 @app.route('/lessons/<lesson:lesson>/', defaults={'page': 'index'})
@@ -255,7 +285,7 @@ def lesson(lesson, page, solution=None):
 
 @app.route('/<course:course>/sessions/<session>/', defaults={'coverpage': 'front'})
 @app.route('/<course:course>/sessions/<session>/<coverpage>/')
-def session_coverpage(course, session, coverpage):
+def session_coverpage(course, session, coverpage, content_only=False):
     """Render the session coverpage.
 
     Args:
@@ -267,7 +297,32 @@ def session_coverpage(course, session, coverpage):
         rendered session coverpage
     """
     if course.is_link():
-        return course.render_session_coverpage(session, coverpage)
+        data_from_fork = course.render_session_coverpage(session, coverpage)
+
+        try:
+            course = data_from_fork.get("course", {})
+
+            response = render_template(
+                "link/coverpage_link.html",
+                course_title=course.get("title"),
+                course_url=course.get("url"),
+
+                coach_present=data_from_fork.get("coach_present"),
+                edit_url=data_from_fork.get("edit_url"),
+                content=data_from_fork.get("content"),
+
+                session_title=data_from_fork.get("session_title"),
+            )
+            response = make_response(response)
+            response.headers["X-RENDERED-FROM-ARCA"] = ""
+
+            return response
+        except TemplateNotFound:
+            abort(404)
+
+
+    if course.is_link():
+        return
 
     session = course.sessions.get(session)
 
@@ -282,9 +337,9 @@ def session_coverpage(course, session, coverpage):
 
     content = session.get_coverpage_content(course, coverpage, app)
 
-    template = "coverpage.html"
+    template = "coverpage.html" if not content_only else "content/coverpage.html"
     if coverpage == "back":
-        template = "backpage.html"
+        template = "backpage.html" if not content_only else "content/backpage.html"
 
     homework_section = False
     link_section = False
@@ -309,33 +364,35 @@ def session_coverpage(course, session, coverpage):
                            cheatsheet_section=cheatsheet_section)
 
 
-def list_months(start_date, end_date):
-    """Return a span of months as a list of (year, month) tuples
-
-    The months of start_date and end_date are both included.
-    """
-    months = []
-    year = start_date.year
-    month = start_date.month
-    while (year, month) <= (end_date.year, end_date.month):
-        months.append((year, month))
-        month += 1
-        if month > 12:
-            month = 1
-            year += 1
-    return months
-
-
 @app.route('/<course:course>/calendar/')
-def course_calendar(course):
+def course_calendar(course, content_only=False):
     if not course.start_date:
         abort(404)
 
     if course.is_link():
-        return course.render_calendar()
+        data_from_fork = course.render_calendar()
+
+        try:
+            course = data_from_fork.get("course", {})
+
+            response = render_template(
+                "link/course_calendar_link.html",
+                course_title=course.get("title"),
+                course_url=course.get("url"),
+
+                coach_present=data_from_fork.get("coach_present"),
+                edit_url=data_from_fork.get("edit_url"),
+                content=data_from_fork.get("content"),
+            )
+            response = make_response(response)
+            response.headers["X-RENDERED-FROM-ARCA"] = ""
+
+            return response
+        except TemplateNotFound:
+            abort(404)
 
     sessions_by_date = {s.date: s for s in course.sessions.values()}
-    return render_template('course_calendar.html',
+    return render_template('course_calendar.html' if not content_only else 'content/course_calendar.html',
                            edit_path=course.edit_path,
                            course=course,
                            sessions_by_date=sessions_by_date,

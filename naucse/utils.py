@@ -1,6 +1,9 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from datetime import date, datetime, time
 
+from flask import url_for
+
+from naucse.templates import edit_link
 from . import routes
 from .models import Course
 
@@ -20,6 +23,10 @@ def course_info(slug: str, *args, **kwargs) -> Dict[str, Any]:
     """ Returns info about the course/run. Returns some extra info when it's a run (based on COURSE_INFO/RUN_INFO)
     """
     course = get_course_from_slug(slug)
+
+    if course.is_link():
+        raise ValueError("Circular dependency.")
+
     if "course" in slug:
         attributes = Course.COURSE_INFO
     else:
@@ -38,7 +45,19 @@ def course_info(slug: str, *args, **kwargs) -> Dict[str, Any]:
     return data
 
 
-def render(page_type: str, slug: str, *args, **kwargs) -> str:
+def serialize_license(license) -> Optional[Dict[str, str]]:
+    """ Serializes a License instance into a dict
+    """
+    if license:
+        return {
+            "url": license.url,
+            "title": license.title
+        }
+
+    return None
+
+
+def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
     """ Returns a rendered page for a course, based on page_type and slug.
     """
     course = get_course_from_slug(slug)
@@ -47,17 +66,64 @@ def render(page_type: str, slug: str, *args, **kwargs) -> str:
         raise ValueError("Circular dependency.")
 
     with routes.app.test_request_context():
+        info = {
+            "course": {
+                "title": course.title,
+                "url": routes.course_url(course)
+            },
+            "edit_url": edit_link(course.edit_path),
+            "coach_present": course.vars["coach-present"]
+        }
 
         if page_type == "course":
-            return routes.course(course)
+            info.update({
+                "content": routes.course(course, content_only=True)
+            })
 
-        if page_type == "calendar":
-            return routes.course_calendar(course)
+        elif page_type == "calendar":
+            info.update({
+                "content": routes.course_calendar(course, content_only=True)
+            })
 
-        if page_type == "course_page":
+        elif page_type == "course_page":
             lesson_slug, page, solution, *_ = args
-            return routes.course_page(course, routes.model.get_lesson(lesson_slug), page, solution)
+            lesson = routes.model.get_lesson(lesson_slug)
 
-        if page_type == "session_coverpage":
-            session, coverpage, *_ = args
-            return routes.session_coverpage(course, session, coverpage)
+            info.update({
+                "canonical_url": url_for('lesson', lesson=lesson, _external=True),
+                "content": routes.course_page(course, lesson, page, solution, content_only=True),
+            })
+
+            page, session, *_ = routes.get_page(course, lesson, page)
+            info.update({
+                "page": {
+                    "title": page.title,
+                    "css": page.css,
+                    "latex": page.latex,
+                    "attributions": page.attributions,
+                    "license": serialize_license(page.license),
+                    "license_code": serialize_license(page.license_code)
+                },
+                "edit_url": edit_link(page.edit_path),
+            })
+
+            if session is not None:
+                info["session"] = {
+                    "title": session.title,
+                    "url": url_for("session_coverpage", course=course.slug, session=session.slug)
+                }
+
+        elif page_type == "session_coverpage":
+            session_slug, coverpage, *_ = args
+
+            session = course.sessions.get(session_slug)
+
+            info.update({
+                "session_title": session.title,
+                "content": routes.session_coverpage(course, session_slug, coverpage, content_only=True),
+                "edit_url": edit_link(session.get_edit_path(course, coverpage))
+            })
+        else:
+            raise ValueError("Invalid page type.")
+
+        return info

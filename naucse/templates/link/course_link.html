@@ -1,9 +1,9 @@
 {% extends "_base_course.html" %}
 
 {% block breadcrumbs %}
-> {{ course.title }}
+> {{ course_title }}
 {% endblock %}
 
 {% block course_content %}
-  {% include "content/course.html" %}
+  {{ content|safe }}
 {% endblock %}

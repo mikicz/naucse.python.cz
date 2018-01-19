@@ -3,6 +3,7 @@ import datetime
 import pytest
 
 import naucse.routes
+import naucse.routes_util
 
 
 @pytest.mark.parametrize(
@@ -22,4 +23,4 @@ import naucse.routes
           (2017, 12), (2018, 1)]),
     ])
 def test_list_months(start, end, expected):
-    assert naucse.routes.list_months(start, end) == expected
+    assert naucse.routes_util.list_months(start, end) == expected

@@ -1,0 +1,27 @@
+{% extends "_base.html" %}
+
+{% block content %}
+
+<div class="page">
+    <div class="container">
+
+        {% if course is defined or coach_present is defined %}
+            <header class="lesson-header">
+                <a href="{{ url_for('index') }}">Nauč se Python </a>
+                {% if (course is defined and course.vars['coach-present']) or (coach_present is defined and coach_present) %}
+                > <a href="{{ url_for('runs') }}">Kurzy</a>
+                {% else %}
+                > <a href="{{ url_for('courses') }}">Materiály</a>
+                {% endif%}
+                {% block breadcrumbs %}{% endblock %}
+                <hr>
+            </header>
+        {% endif %}
+
+        {% block course_content %}
+        {% endblock %}
+
+    </div>
+</div>
+
+{% endblock content %}
