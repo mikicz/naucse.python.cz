@@ -12,4 +12,3 @@ pygments
 traitlets
 werkzeug
 git+https://github.com/mikicz/arca.git@docker_backend#egg=arca
-beautifulsoup4

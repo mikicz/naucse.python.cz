@@ -1,13 +1,34 @@
 import collections
 import mimetypes
 import warnings
+from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 import os
-from bs4 import BeautifulSoup, SoupStrainer
 from elsa._shutdown import ShutdownableFreezer
 from flask_frozen import UrlForLogger, MimetypeMismatchWarning, RedirectWarning, conditional_context, patch_url_for, \
     NotFoundWarning
+
+
+class ExtractLinksParser(HTMLParser):
+    def __init__(self, logger, **kwargs):
+        self.logger = logger
+        super(ExtractLinksParser, self).__init__(**kwargs)
+
+    def should_add(self, url):
+        return bool(urlparse(url).netloc) and url.starstwith("/")
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            attrs = dict(attrs)
+            if attrs.get("href") and self.should_add(attrs["href"]):
+                self.logger.links.append(attrs["href"])
+
+    def handle_startendtag(self, tag, attrs):
+        if tag == "img":
+            attrs = dict(attrs)
+            if attrs.get("src") and self.should_add(attrs["src"]):
+                self.logger.links.append(attrs["src"])
 
 
 class AllLinksLogger(UrlForLogger):
@@ -15,18 +36,10 @@ class AllLinksLogger(UrlForLogger):
     def __init__(self, *args):
         super(AllLinksLogger, self).__init__(*args)
         self.links = collections.deque()
-
-    def is_absolute(self, url):
-        return bool(urlparse(url).netloc)
+        self.parser = ExtractLinksParser(self)
 
     def add_page(self, content):
-        for link in BeautifulSoup(content, "html.parser", parse_only=SoupStrainer("a")):
-            if link.has_attr("href") and not self.is_absolute(link["href"]) and link["href"].startswith("/"):
-                self.links.append(link["href"])
-
-        for img in BeautifulSoup(content, "html.parser", parse_only=SoupStrainer("img")):
-            if img.has_attr("src") and not self.is_absolute(img["src"]) and img["src"].startswith("/"):
-                self.links.append(img["src"])
+        self.parser.feed(content.decode("utf-8"))
 
     def iter_calls(self):
         while self.logged_calls or self.links:
