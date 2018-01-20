@@ -19,7 +19,10 @@ class Model:
     def __init__(self, root, path):
         self.root = root
         self.path = Path(path)
-        self.relative_path = self.path.relative_to(Path.cwd())
+        if self.path.is_absolute():
+            self.relative_path = self.path.relative_to(Path.cwd())
+        else:
+            self.relative_path = self.path
 
     def __str__(self):
         return '0x{:x}'.format(id(self))

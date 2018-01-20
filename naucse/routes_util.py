@@ -1,4 +1,5 @@
 import datetime
+from html.parser import HTMLParser
 
 
 class LicenseLink:
@@ -68,3 +69,48 @@ def list_months(start_date, end_date):
             month = 1
             year += 1
     return months
+
+
+class DisallowedElement(Exception):
+    pass
+
+
+class AllowedElementsParser(HTMLParser):
+
+    def __init__(self, **kwargs):
+        super(AllowedElementsParser, self).__init__(**kwargs)
+
+        self.allowed_elements = {
+            # functional:
+            'a', 'abbr', 'audio', 'img', 'source',
+
+            # styling:
+            'big', 'blockquote', 'code', 'font', 'i', 'tt', 'kbd', 'u', 'var', 'small', 'em', 'strong', 'sub',
+
+            # formatting:
+            'br', 'div', 'hr', 'p', 'pre', 'span',
+
+            # lists
+            'dd', 'dl', 'dt', 'li', 'ul', 'ol',
+
+            # headers
+            'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+
+            # tables
+            'table', 'tbody', 'td', 'th', 'thead', 'tr',
+
+            # TODO: Should this be here?
+            'style',
+        }
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in self.allowed_elements:
+            raise DisallowedElement(f"Element {tag} is not allowed.")
+
+    def handle_startendtag(self, tag, attrs):
+        if tag not in self.allowed_elements:
+            raise DisallowedElement(f"Element {tag} is not allowed.")
+
+    def reset_and_feed(self, data):
+        self.reset()
+        self.feed(data)

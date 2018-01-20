@@ -1,18 +1,19 @@
-import logging
 from collections import OrderedDict
 from datetime import datetime
 
 import jinja2
 from arca import Task
-from flask import make_response
 
 from naucse.modelutils import Model, YamlProperty, DataProperty, DirProperty, MultipleModelDirProperty, ForkProperty
 from naucse.modelutils import reify, arca
+from naucse.routes_util import AllowedElementsParser
 from naucse.templates import setup_jinja_env, vars_functions
 from naucse.markdown_util import convert_markdown
 from naucse.notebook_util import convert_notebook
 from pathlib import Path
 
+
+allowed_elements_parser = AllowedElementsParser()
 
 
 class Lesson(Model):
@@ -467,10 +468,7 @@ class CourseLink(CourseMixin, Model):
         )
         result = arca.run(self.repo, self.branch, task)
 
-        try:
-            logging.error(result.error)
-        except AttributeError:
-            pass
+        allowed_elements_parser.reset_and_feed(result.result["content"])
 
         return result.result
 

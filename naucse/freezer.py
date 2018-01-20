@@ -16,7 +16,7 @@ class ExtractLinksParser(HTMLParser):
         super(ExtractLinksParser, self).__init__(**kwargs)
 
     def should_add(self, url):
-        return bool(urlparse(url).netloc) and url.starstwith("/")
+        return not bool(urlparse(url).netloc) and url.startswith("/")
 
     def handle_starttag(self, tag, attrs):
         if tag == "a":

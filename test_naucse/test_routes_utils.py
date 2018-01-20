@@ -24,3 +24,16 @@ import naucse.routes_util
     ])
 def test_list_months(start, end, expected):
     assert naucse.routes_util.list_months(start, end) == expected
+
+
+def test_allowed_elements():
+    allowed_elements = naucse.routes_util.AllowedElementsParser()
+
+    allowed_elements.reset_and_feed(
+        "<div><strong><u><a>Test</a></u></div>"
+    )
+
+    with pytest.raises(naucse.routes_util.DisallowedElement):
+        allowed_elements.reset_and_feed(
+            "<div><script>alert('XSS')</script></div>"
+        )
