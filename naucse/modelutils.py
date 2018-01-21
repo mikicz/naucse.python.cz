@@ -97,12 +97,7 @@ class ForkProperty(LazyProperty):
 
         result = arca.run(getattr(instance, self.repo_prop.name), getattr(instance, self.branch_prop.name), task)
 
-        try:
-            logging.error(result.error)
-        except AttributeError:
-            pass
-
-        return result.result
+        return result.output
 
 
 class DataProperty:

@@ -468,9 +468,9 @@ class CourseLink(CourseMixin, Model):
         )
         result = arca.run(self.repo, self.branch, task)
 
-        allowed_elements_parser.reset_and_feed(result.result["content"])
+        allowed_elements_parser.reset_and_feed(result.output["content"])
 
-        return result.result
+        return result.output
 
     def render_course(self):
         return self.render("course")

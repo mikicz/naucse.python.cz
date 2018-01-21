@@ -11,6 +11,7 @@ from flask_frozen import UrlForLogger, MimetypeMismatchWarning, RedirectWarning,
 
 
 class ExtractLinksParser(HTMLParser):
+
     def __init__(self, logger, **kwargs):
         self.logger = logger
         super(ExtractLinksParser, self).__init__(**kwargs)
