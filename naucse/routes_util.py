@@ -1,5 +1,9 @@
 import datetime
+import logging
 from html.parser import HTMLParser
+from xml.dom import SyntaxErr
+
+import cssutils
 
 
 class LicenseLink:
@@ -79,7 +83,8 @@ class AllowedElementsParser(HTMLParser):
 
     def __init__(self, **kwargs):
         super(AllowedElementsParser, self).__init__(**kwargs)
-
+        self.current_element = None
+        self.css_parser = cssutils.CSSParser(raiseExceptions=True)
         self.allowed_elements = {
             # functional:
             'a', 'abbr', 'audio', 'img', 'source',
@@ -99,17 +104,34 @@ class AllowedElementsParser(HTMLParser):
             # tables
             'table', 'tbody', 'td', 'th', 'thead', 'tr',
 
-            # TODO: Should this be here?
+            # A special check is applied in `handle_data` method (only `.dataframe` styles allowed)
             'style',
         }
 
     def handle_starttag(self, tag, attrs):
         if tag not in self.allowed_elements:
             raise DisallowedElement(f"Element {tag} is not allowed.")
+        self.current_element = tag
 
     def handle_startendtag(self, tag, attrs):
         if tag not in self.allowed_elements:
             raise DisallowedElement(f"Element {tag} is not allowed.")
+        self.current_element = tag
+
+    def handle_data(self, data):
+        if self.current_element == "style":
+            try:
+                parsed_css = self.css_parser.parseString(data)
+            except SyntaxErr:
+                raise DisallowedElement("Style element is only allowed when it modifies .dataframe elements,"
+                                        "could not parse styles and verify.")
+            else:
+                if len(parsed_css.cssRules) == 0:
+                    return
+
+                if not all([rule.selectorText.startswith(".dataframe") for rule in parsed_css.cssRules]):
+                    raise DisallowedElement("Style element is only allowed when it modifies .dataframe elements. "
+                                            "Rendered page contains a style that modifies something else.")
 
     def reset_and_feed(self, data):
         self.reset()

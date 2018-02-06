@@ -16,7 +16,7 @@ class NaucseHTMLExporter(HTMLExporter):
         return 'basic'
 
     def from_notebook_node(self, nb, resources=None, **kw):
-        '''So we could use our own template filters'''
+        """So we could use our own template filters"""
         langinfo = nb.metadata.get('language_info', {})
         lexer = langinfo.get('pygments_lexer', langinfo.get('name', None))
         highlight = Highlight2HTML(pygments_lexer=lexer, parent=self)

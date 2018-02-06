@@ -12,3 +12,4 @@ pygments
 traitlets
 werkzeug
 git+https://github.com/mikicz/arca.git#egg=arca
+cssutils
