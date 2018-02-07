@@ -110,6 +110,7 @@ class Page(Model):
     def render_html(self, solution=None,
                     static_url=None,
                     lesson_url=None,
+                    subpage_url=None,
                     vars=None,
                     ):
         lesson = self.lesson
@@ -136,11 +137,15 @@ class Page(Model):
                     url += '{}/'.format(solution)
                 return url
 
+        if subpage_url is None:
+            def subpage_url(page):
+                return lesson_url(lesson=lesson, page=page)
+
         kwargs = {
             'static': lambda path: static_url(path),
             'lesson_url': lambda lesson, page='index', solution=None:
                 lesson_url(lesson=lesson, page=page, solution=solution),
-            'subpage_url': lambda page: lesson_url(lesson=lesson, page=page),
+            'subpage_url': subpage_url,
             'lesson': lesson,
             'page': self,
             '$solutions': solutions,
@@ -395,8 +400,8 @@ class Course(CourseMixin, Model):
 
     canonical = DataProperty(info, default=False)
 
-    COURSE_INFO = ["title", "description"]
-    RUN_INFO = ["title", "description", "start_date", "end_date", "subtitle", "derives"]
+    COURSE_INFO = ["title", "description", "vars"]
+    RUN_INFO = ["title", "description", "start_date", "end_date", "subtitle", "derives", "vars"]
 
     @property
     def derives(self):
@@ -449,6 +454,7 @@ class CourseLink(CourseMixin, Model):
     end_date = DataProperty(info, convert=lambda x: datetime.strptime(x, "%Y-%m-%d").date())
     subtitle = DataProperty(info, default=None)
     derives = DataProperty(info, default=None)
+    vars = DataProperty(info, default=None)
 
     def __str__(self):
         return '{} - {}'.format(self.slug, self.title)
@@ -460,13 +466,15 @@ class CourseLink(CourseMixin, Model):
             return None
         return self.root.courses[name]
 
-    def render(self, page_type, *args):
+    def render(self, page_type, *args, **kwargs):
         task = Task(
             "naucse.utils.render",
             args=[page_type, self.slug] + list(args),
+            kwargs=kwargs,
             imports=["naucse.utils"]
         )
-        result = arca.run(self.repo, self.branch, task)
+        result = arca.run(self.repo, self.branch, task,
+                          reference=Path("."), depth=-1)
 
         allowed_elements_parser.reset_and_feed(result.output["content"])
 
@@ -478,14 +486,16 @@ class CourseLink(CourseMixin, Model):
     def render_calendar(self):
         return self.render("calendar")
 
-    def render_page(self, lesson, page, solution):
-        return self.render("course_page", lesson.slug, page, solution)
+    def render_page(self, lesson_slug, page, solution, content_hash=None, content_offer=None):
+        return self.render("course_page", lesson_slug, page, solution,
+                           content_hash=content_hash, content_offer=content_offer)
 
     def render_session_coverpage(self, session, coverpage):
         return self.render("session_coverpage", session, coverpage)
 
     def lesson_static(self, lesson, path):
-        filename = arca.static_filename(self.repo, self.branch, lesson.relative_path / "static" / path).resolve()
+        filename = arca.static_filename(self.repo, self.branch, lesson.relative_path / "static" / path,
+                                        reference=Path("."), depth=-1).resolve()
 
         return filename.parent, filename.name
 
@@ -531,6 +541,8 @@ class Root(Model):
     def get_lesson(self, name):
         if isinstance(name, Lesson):
             return name
+        if name[-1] == "/":
+            name = name[:-1]
         collection_name, name = name.split('/', 2)
         collection = self.collections[collection_name]
         return collection.lessons[name]

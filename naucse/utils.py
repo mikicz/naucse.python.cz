@@ -69,10 +69,11 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
         info = {
             "course": {
                 "title": course.title,
-                "url": routes.course_url(course)
+                "url": routes.course_url(course),
+                "coach_present": course.vars["coach-present"],
+                "is_derived": course.base_course is not None
             },
             "edit_url": edit_link(course.edit_path),
-            "coach_present": course.vars["coach-present"]
         }
 
         if page_type == "course":
@@ -91,10 +92,11 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
 
             info.update({
                 "canonical_url": url_for('lesson', lesson=lesson, _external=True),
-                "content": routes.course_page(course, lesson, page, solution, content_only=True),
+                "content": routes.course_page(course, lesson, page, solution, content_only=True, **kwargs),
             })
 
-            page, session, *_ = routes.get_page(course, lesson, page)
+            page, session, prv, nxt = routes.get_page(course, lesson, page)
+
             info.update({
                 "page": {
                     "title": page.title,
@@ -112,6 +114,15 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                     "title": session.title,
                     "url": url_for("session_coverpage", course=course.slug, session=session.slug)
                 }
+
+            lesson_url, *_ = routes.relative_url_functions(lesson_slug, page.slug != "index", solution)
+
+            prev_link, session_link, next_link = routes.get_footer_links(course, session, prv, nxt, lesson_url)
+            info["footer"] = {
+                "prev_link": prev_link,
+                "session_link": session_link,
+                "next_link": next_link
+            }
 
         elif page_type == "session_coverpage":
             session_slug, coverpage, *_ = args

@@ -1,38 +1,3 @@
 {% block lesson_content %}
     {{ content }}
 {% endblock %}
-
-{% if (prv is defined and prv != None) or (nxt is defined and nxt != None) %}
-<hr class="lesson-end">
-
-{% if course is defined and not course.canonical %}
-    <div class="alert alert-info">
-        Toto je stránka lekce z kurzu, který probíhá nebo proběhl naživo s instruktorem.
-        {% if course.base_course %}
-            <a href="{{ canonical_url }}">Přejít na stejnou lekci v kurzu pro samouky</a>.
-        {% endif %}
-    </div>
-{% endif %}
-
-<div class="row prev-next">
-    <div class="col text-left">
-    {% if prv is defined and prv != None %}
-        <a href="{{ lesson_url(lesson=prv.page.lesson, page=prv.page.slug) }}">← <span class="d-none d-sm-block">{{ prv.title }}</span></a>
-    {% endif %}
-    </div>
-
-    <div class="col text-center">
-    {% if session and course is defined %}
-        <a href="{{ session_url(course.slug, session.slug) }}">↑ <span class="d-none d-sm-block">Lekce: {{ session.title }}</span></a>
-    {% endif %}
-    </div>
-
-    <div class="col text-right">
-    {% if nxt is defined and nxt != None %}
-        <a href="{{ lesson_url(lesson=nxt.page.lesson, page=nxt.page.slug) }}"><span class="d-none d-sm-block">{{ nxt.title }}</span> →</a>
-    {% elif session and course is defined %}
-        <a href="{{ session_url(course.slug, session.slug, 'back') }}"><span class="d-none d-sm-block">Závěr lekce</span> →</a>
-    {% endif %}
-    </div>
-</div>
-{% endif %}

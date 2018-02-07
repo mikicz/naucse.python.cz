@@ -49,7 +49,7 @@
 
     <div class="col text-right">
     {% if session.next is defined and session.next != None %}
-        <a href="{{ session_url(course.slug, session.next.slug) }}"><span class="d-none d-sm-block">Lekce: {{ session.next.title }}</span> →</a>
+        <a href="{{ session_url(course.slug, session.next.slug) }}">→ <span class="d-none d-sm-block">Lekce: {{ session.next.title }}</span></a>
     {% endif %}
     </div>
 </div>

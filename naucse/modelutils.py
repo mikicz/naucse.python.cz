@@ -1,4 +1,3 @@
-import logging
 from collections import OrderedDict
 from pathlib import Path
 import sys
@@ -7,10 +6,18 @@ import yaml
 from arca import Task, Arca
 
 arca = Arca(settings={"ARCA_BACKEND": "arca.backend.DockerBackend",
+                      # "ARCA_BACKEND_CURRENT_ENVIRONMENT_REQUIREMENTS": "requirements.txt",
                       "ARCA_BACKEND_VERBOSITY": 2,
+                      "ARCA_BACKEND_APK_DEPENDENCIES": ["libffi-dev"],
+                      "ARCA_BACKEND_KEEP_CONTAINER_RUNNING": True,
                       "ARCA_SINGLE_PULL": True,
-                      "ARCA_DOCKER_BACKEND_KEEP_CONTAINER_RUNNING": True,
-                      "ARCA_CACHE_BACKEND": "dogpile.cache.memory"})
+                      "ARCA_IGNORE_CACHE_ERRORS": True,
+                      "ARCA_CACHE_BACKEND": "dogpile.cache.redis",
+                      "ARCA_CACHE_BACKEND_ARGUMENTS": {
+                          "host": "localhost",
+                          "port": 6379,
+                          "db": 19,
+                      }})
 
 NOTHING = object()
 
@@ -95,7 +102,8 @@ class ForkProperty(LazyProperty):
     def compute(self, instance):
         task = Task(**self.process_kwargs(instance))
 
-        result = arca.run(getattr(instance, self.repo_prop.name), getattr(instance, self.branch_prop.name), task)
+        result = arca.run(getattr(instance, self.repo_prop.name), getattr(instance, self.branch_prop.name), task,
+                          reference=Path("."), depth=-1)
 
         return result.output
 

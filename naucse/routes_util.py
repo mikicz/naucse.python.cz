@@ -1,9 +1,9 @@
 import datetime
-import logging
 from html.parser import HTMLParser
 from xml.dom import SyntaxErr
 
 import cssutils
+from git import Repo
 
 
 class LicenseLink:
@@ -73,6 +73,26 @@ def list_months(start_date, end_date):
             month = 1
             year += 1
     return months
+
+
+_last_commit = None
+
+
+def last_commit_modifying_lessons():
+    """ Returns commit hash of the last commit which modified either lessons contents or rendering mechanisms of naucse.
+    """
+    from .routes import app
+    global _last_commit
+    if _last_commit:
+        return _last_commit
+
+    # git log -n 1 --format=%H lessons/ naucse/ licenses/
+    last_commit = Repo(".").git.log("lessons/", "naucse/", n=1, format="%H")
+
+    if not app.config['DEBUG']:
+        _last_commit = last_commit
+
+    return last_commit
 
 
 class DisallowedElement(Exception):

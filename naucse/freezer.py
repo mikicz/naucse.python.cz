@@ -2,7 +2,7 @@ import collections
 import mimetypes
 import warnings
 from html.parser import HTMLParser
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 import os
 from elsa._shutdown import ShutdownableFreezer
@@ -11,42 +11,60 @@ from flask_frozen import UrlForLogger, MimetypeMismatchWarning, RedirectWarning,
 
 
 class ExtractLinksParser(HTMLParser):
+    """ ExtractLinksParser logs all absolute and relative urls to the AllLinksLogger, in a absolute form (for that the
+        `current_url` attribute is set)
+    """
 
     def __init__(self, logger, **kwargs):
         self.logger = logger
+        self.current_url = None
         super(ExtractLinksParser, self).__init__(**kwargs)
 
     def should_add(self, url):
-        return not bool(urlparse(url).netloc) and url.startswith("/")
+        return not bool(urlparse(url).netloc) and (url.startswith("/") or
+                                                   url.startswith("./") or
+                                                   url.startswith("../") or
+                                                   url.startswith("static/"))
+    def add_absolute_url(self, url):
+        if not url.startswith("/"):
+            url = urljoin(self.current_url, url)
+        self.logger.links.append(url)
 
     def handle_starttag(self, tag, attrs):
         if tag == "a":
             attrs = dict(attrs)
             if attrs.get("href") and self.should_add(attrs["href"]):
-                self.logger.links.append(attrs["href"])
+                self.add_absolute_url(attrs["href"])
 
     def handle_startendtag(self, tag, attrs):
         if tag == "img":
             attrs = dict(attrs)
             if attrs.get("src") and self.should_add(attrs["src"]):
-                self.logger.links.append(attrs["src"])
+                self.add_absolute_url(attrs["src"])
 
 
 class AllLinksLogger(UrlForLogger):
+    """ AllLinksLogger logs both `url_for` calls and urls parsed from content (either returned from Arca or built,
+        locally). The `iter_calls` method yields primarily urls from `url_for`, because they're more likely to be
+        the ones, whose cached content will be later used in parsed urls.
+    """
 
     def __init__(self, *args):
         super(AllLinksLogger, self).__init__(*args)
         self.links = collections.deque()
         self.parser = ExtractLinksParser(self)
 
-    def add_page(self, content):
+    def add_page(self, url, content):
+        self.parser.current_url = url
         self.parser.feed(content.decode("utf-8"))
 
     def iter_calls(self):
         while self.logged_calls or self.links:
+            yielded = False
             if self.logged_calls:
                 yield self.logged_calls.popleft()
-            if self.links:
+                yielded = True
+            if not yielded and self.links:
                 yield self.links.popleft()
 
 
@@ -56,7 +74,7 @@ class NaucseFreezer(ShutdownableFreezer):
         super(NaucseFreezer, self).__init__(app)
         self.url_for_logger = AllLinksLogger(app)  # override the default url_for_logger with our modified version
 
-    # This function is a copy from the original Freezer
+    # This method is a copy from the original Freezer
     # For efficiency sake the response is needed and there isn't a nice way to access it nicely
     # The modified part is at the bottom, clearly marked.
 
@@ -137,8 +155,8 @@ class NaucseFreezer(ShutdownableFreezer):
         # START MODIFIED PART
         ################################################################################################################
 
-        if filename.endswith(".html") and "X-RENDERED-FROM-ARCA" in response.headers:
-            self.url_for_logger.add_page(content)
+        if filename.endswith(".html"):
+            self.url_for_logger.add_page(url, content)
 
         ################################################################################################################
         # END_MODIFIED PART
