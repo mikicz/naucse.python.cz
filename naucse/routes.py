@@ -212,11 +212,10 @@ def render_page(page, solution=None, vars=None, **kwargs):
 
             if content_offer_hash == content_hash:
                 content = jinja2.Markup(content_offer)
-            elif not content_only:
+            elif not content_only and not arca.is_dirty():
                 # even if this condition would be changed in forks, this will not poison cache in
                 # Arca Docker and Vagrant backends - cache initialization will fail and null cache will be used
                 # instead thanks to the ARCA_IGNORE_CACHE_ERRORS setting
-
                 content = arca.region.get_or_create(
                     key=content_hash,
                     creator=render_content,
@@ -352,29 +351,30 @@ def course_link_page(course, lesson_slug, page, solution):
     kwargs = {}
 
     # if the page is canonical (exists in the root repository), try to retrieve it from cache (with correct variables),
-    # offer it to the fork
-    try:
-        model.get_lesson(lesson_slug)
+    # offer it to the fork, unless the current working repo was modified
+    if not arca.is_dirty():
+        try:
+            model.get_lesson(lesson_slug)
 
-        content_hash = hash_content_info(
-            {
-                "commit": last_commit_modifying_lessons(),
-                "lesson": lesson_slug,
-                "page": page,
-                "solution": solution,
-                "vars": course.vars
-            })
+            content_hash = hash_content_info(
+                {
+                    "commit": last_commit_modifying_lessons(),
+                    "lesson": lesson_slug,
+                    "page": page,
+                    "solution": solution,
+                    "vars": course.vars
+                })
 
-        content_offer = arca.region.get(content_hash)
+            content_offer = arca.region.get(content_hash)
 
-        if content_offer:
-            kwargs.update({
-                "content_hash": content_hash,
-                "content_offer": str(content_offer)
-            })
+            if content_offer:
+                kwargs.update({
+                    "content_hash": content_hash,
+                    "content_offer": str(content_offer)
+                })
 
-    except LookupError:
-        pass
+        except LookupError:
+            pass
 
     data_from_fork = course.render_page(lesson_slug, page, solution, **kwargs)
     # data_from_fork = render("course_page", course.slug, lesson_slug, page, solution, **kwargs)
