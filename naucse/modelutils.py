@@ -5,18 +5,17 @@ import sys
 import yaml
 from arca import Task, Arca
 
-arca = Arca(settings={"ARCA_BACKEND": "arca.backend.DockerBackend",
-                      # "ARCA_BACKEND_CURRENT_ENVIRONMENT_REQUIREMENTS": "requirements.txt",
+Path(".arca/cache").mkdir(parents=True, exist_ok=True)
+
+arca = Arca(settings={"ARCA_BACKEND": "arca.backend.CurrentEnvironmentBackend",
+                      "ARCA_BACKEND_CURRENT_ENVIRONMENT_REQUIREMENTS": "requirements.txt",
                       "ARCA_BACKEND_VERBOSITY": 2,
                       "ARCA_BACKEND_APK_DEPENDENCIES": ["libffi-dev"],
                       "ARCA_BACKEND_KEEP_CONTAINER_RUNNING": True,
                       "ARCA_SINGLE_PULL": True,
-                      "ARCA_IGNORE_CACHE_ERRORS": True,
-                      "ARCA_CACHE_BACKEND": "dogpile.cache.redis",
+                      "ARCA_CACHE_BACKEND": "dogpile.cache.dbm",
                       "ARCA_CACHE_BACKEND_ARGUMENTS": {
-                          "host": "localhost",
-                          "port": 6379,
-                          "db": 19,
+                        "filename": ".arca/cache/naucse.dbm"
                       }})
 
 NOTHING = object()

@@ -26,4 +26,4 @@ def main():
     logger = logging.getLogger("arca")
     logger.addHandler(handler)
 
-    cli(app, base_url='http://naucse.python.cz', freezer=NaucseFreezer(app))
+    cli(app, base_url='http://naucse.poul.me', freezer=NaucseFreezer(app))

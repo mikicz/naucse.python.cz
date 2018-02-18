@@ -13,8 +13,19 @@ deploy:
   skip_cleanup: true
   script: python -m naucse deploy --push --no-freeze
   on:
-    branch: master
-    repo: pyvec/naucse.python.cz
+    branch: rendering_from_modified
+    repo: mikicz/naucse.python.cz
+branches:
+  only:
+    - rendering_from_modified
+    - arca_implementation
 env:
   global:
-  - secure: pEZZeBdTSg0WUQYfwKZCiM+VMmNf2GyCCDa5Qcw2xGaNi5Z3rb3IYntY5ACKtDazgjzul+AqHra7iEx41yictXu4wYYt1nSY7g+ilBq/SlefiTi92ZRLH9elEChOa4A2njeuFIzwLBRr4Hdnn+21Vd/uxbC0wGhRC5c11ixBVC7Kn6zatT2TXUN+zF5a63NgUDrY/SPMV0jX3nozFHOxAQmZqlV1VL7O5ihct+mLYxB6MhS1NO/v30cMwyQm9nO0wBGJ1YH5/SKk9ThvFKH15d0xLVjZMfhJ/sgqpRnuRw4awH7SV7p2BoF7/07P8VWnCNvJ+wCipd1PqAk3COgqriWCBx80auaevIDxzky4CUk/efd3WYOA4MnzSAvcjbcQjojjsi64WWwVAcWuweTA8AEYMhVdqWlMbo8E3Oa0dZcyscBo+L26OdAdKNUqeNVQ84oIcPN/iUCitLB5GVOc0cIkn9wFer66jSuwK9bRfOTmV6NaRdLt78Edo+e1wXx0sdTVasL/rtIRTJAKKUtF8D/8RFfCNopOcceAyPr/Ay3JjVEFk2rTWeZls8E8os3TN6evVawx0t2xA0qXYb6IIrb0CFxv6sz/pU7vkuzS8g+pdQnfMmNtQ01sGGyedTT4YQRcgGKmWG+kolOXQlxJCGOndgz3VGN3DCppA5Ahbfo=
+    - secure: cYYbe6i4CUP/X8V0NOT3bO5E+mq8K5IsJPtbrByibGWKu+PPCdeHwtHjcH+w+emp2UYBNeiT5pAJ+3fsN3LCF0W0t7b/4/L4iZvJtVvUa//BgW0Pa25xPnZbwPQ3LWOdsdw0odQLsaj2rs1k5GuLEOse07Ts6n1WReHapsrYr9TXiaRLPGilDtwjUOocxVRqpx15AMOoCLH2D+4A/HwM7E0kV/6fk/+dIQVbq2i/hJ8Z3ZLj488QcN3iiZPVX1gNYiyYuFrpXbVEyQhNAxwUSim6/wZUSf45fitishbH2Ii1JFGptp/qFWn0ewbFfAOaQ7LwqQ/jVElgg3Of19VLEWAJsTk7GZIbCX61xW0oO9qYzP7AEeR/m+GBkDYRGu9Z5ReenpsxxlYFQZkHSN1jA3KKVLOqSSFmzFgYnj/F4BW0oKR8dVpk79Q4BTFAOBZcXmpHDVl4d7NmWXhraB+ispog3pK40we80MPFTfMuA+oWXDQyslCUJbzcl4EtyaY+vYkbg3vVFBl3OHsQC0BujyUpM4RI/7wTMR9OPcNyg1zuyM/cVhw21AvebFyQMt2qwSOIlhRW11faeZIVeAAqAGnrcVdiYKaVw5GmnCrrMN8anzlOaZege/rFwkg/dB/+NfhEtY7mZKHmfSl8kC5duaz6aNdAa5l8c39s4OPmE0c=
+    - ARCA_BACKEND=arca.backend.DockerBackend
+
+sudo: required
+services:
+- docker
+notifications:
+  email: false
