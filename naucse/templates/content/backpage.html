@@ -5,10 +5,6 @@
     Závěr lekce: {{ session.title }}
 </h1>
 
-<h1>
-    Závěr lekce: {{ session.title }}
-</h1>
-
 {% if homework_section %}
     <h2>Domácí projekty</h2>
     {{ material_list(session.materials, filter_type='homework') }}
