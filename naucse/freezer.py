@@ -16,7 +16,7 @@ class ExtractLinksParser(HTMLParser):
     """
 
     def __init__(self, logger, **kwargs):
-        self.logger = logger
+        self.logger: AllLinksLogger = logger
         self.current_url = None
         super(ExtractLinksParser, self).__init__(**kwargs)
 
@@ -25,10 +25,11 @@ class ExtractLinksParser(HTMLParser):
                                                    url.startswith("./") or
                                                    url.startswith("../") or
                                                    url.startswith("static/"))
+
     def add_absolute_url(self, url):
         if not url.startswith("/"):
             url = urljoin(self.current_url, url)
-        self.logger.links.append(url)
+        self.logger.parsed_links.append(url)
 
     def handle_starttag(self, tag, attrs):
         if tag == "a":
@@ -51,7 +52,7 @@ class AllLinksLogger(UrlForLogger):
 
     def __init__(self, *args):
         super(AllLinksLogger, self).__init__(*args)
-        self.links = collections.deque()
+        self.parsed_links = collections.deque()
         self.parser = ExtractLinksParser(self)
 
     def add_page(self, url, content):
@@ -59,13 +60,16 @@ class AllLinksLogger(UrlForLogger):
         self.parser.feed(content.decode("utf-8"))
 
     def iter_calls(self):
-        while self.logged_calls or self.links:
+        """ Yields all logged urls and links parsed from content.
+            Unfortunately, `yield from` cannot be used as the queues are modified on the go
+        """
+        while self.logged_calls or self.parsed_links:
             yielded = False
             if self.logged_calls:
                 yield self.logged_calls.popleft()
                 yielded = True
-            if not yielded and self.links:
-                yield self.links.popleft()
+            if not yielded and self.parsed_links:
+                yield self.parsed_links.popleft()
 
 
 class NaucseFreezer(ShutdownableFreezer):
