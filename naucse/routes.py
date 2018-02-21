@@ -133,7 +133,7 @@ def course(course, content_only=False):
                 "link/course_link.html",
                 title=course.get("title"),
                 course_title=course.get("title"),
-                coach_present=data_from_fork.get("coach_present"),
+                coach_present=course.get("coach_present"),
                 edit_url=data_from_fork.get("edit_url"),
                 content=data_from_fork.get("content"),
             )
@@ -498,7 +498,7 @@ def session_coverpage(course, session, coverpage, content_only=False):
                 course_title=course.get("title"),
                 course_url=course.get("url"),
 
-                coach_present=data_from_fork.get("coach_present"),
+                coach_present=course.get("coach_present"),
                 edit_url=data_from_fork.get("edit_url"),
                 content=data_from_fork.get("content"),
 
@@ -567,7 +567,7 @@ def course_calendar(course, content_only=False):
                 course_title=course.get("title"),
                 course_url=course.get("url"),
 
-                coach_present=data_from_fork.get("coach_present"),
+                coach_present=course.get("coach_present"),
                 edit_url=data_from_fork.get("edit_url"),
                 content=data_from_fork.get("content"),
             )
