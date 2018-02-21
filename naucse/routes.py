@@ -584,25 +584,41 @@ def course_calendar(course, content_only=False):
                            calendar=calendar.Calendar())
 
 
-@app.route('/<course:course>/calendar.ics')
-def course_calendar_ics(course):
-    if not course.start_date:
-        abort(404)
+def generate_calendar_ics(course):
     calendar = ics.Calendar()
     for session in course.sessions.values():
         if session.start_time:
             start_time = session.start_time
             end_time = session.end_time
         else:
-            abort(404)
+            raise ValueError("One of the sessions doesn't have a start time.")
+
         cal_event = ics.Event(
-            name = session.title,
-            begin = start_time,
-            end = end_time,
-            uid = url_for("session_coverpage",
-                           course=course,
-                           session=session.slug,
-                           _external=True),
+            name=session.title,
+            begin=start_time,
+            end=end_time,
+            uid=url_for("session_coverpage",
+                      course=course,
+                      session=session.slug,
+                      _external=True),
         )
         calendar.events.append(cal_event)
+
+    return calendar
+
+
+@app.route('/<course:course>/calendar.ics')
+def course_calendar_ics(course):
+    if not course.start_date:
+        abort(404)
+
+    if course.is_link():
+        data_from_fork = course.render_calendar_ics()
+        calendar = data_from_fork["calendar"]
+    else:
+        try:
+            calendar = generate_calendar_ics(course)
+        except ValueError:
+            abort(404)
+
     return Response(str(calendar), mimetype="text/calendar")

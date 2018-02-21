@@ -86,6 +86,11 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 "content": routes.course_calendar(course, content_only=True)
             })
 
+        elif page_type == "calendar_ics":
+            info.update({
+                "calendar": str(routes.generate_calendar_ics(course))
+            })
+
         elif page_type == "course_page":
             lesson_slug, page, solution, *_ = args
             lesson = routes.model.get_lesson(lesson_slug)
