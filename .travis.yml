@@ -4,7 +4,7 @@ python:
 cache:
 - pip
 install:
-- pip install -r requirements.txt pytest
+- pip install -r test_requirements.txt
 before_script:
 - docker login -u "$DOCKER_HUB_USERNAME" -p "$DOCKER_HUB_PASSWORD"
 script:

@@ -1,6 +1,7 @@
 from collections import OrderedDict
-from datetime import datetime
+import datetime
 
+import dateutil.tz
 import jinja2
 from arca import Task
 
@@ -13,6 +14,7 @@ from naucse.notebook_util import convert_notebook
 from pathlib import Path
 
 
+_TIMEZONE = 'Europe/Prague'
 allowed_elements_parser = AllowedElementsParser()
 
 
@@ -193,7 +195,11 @@ def material(root, path, info):
         page = lesson.pages[info.get("page", "index")]
         return PageMaterial(root, path, page, info.get("type", "lesson"), info.get("title"))
     elif "url" in info:
-        return UrlMaterial(root, path, info["url"], info["title"], info.get("type"))
+        url = info["url"]
+        if url:
+            return UrlMaterial(root, path, url, info["title"], info.get("type"))
+        else:
+            return SpecialMaterial(root, path, info["title"], info.get("type"))
     else:
         raise ValueError("Unknown material type: {}".format(info))
 
@@ -255,6 +261,17 @@ class UrlMaterial(Material):
         self.title = title
 
 
+class SpecialMaterial(Material):
+    prev = None
+    next = None
+    type = "special"
+    has_navigation = False
+
+    def __init__(self, root, path, title, url_type):
+        super().__init__(root, path, url_type)
+        self.title = title
+
+
 def merge_dict(base, patch):
     """Recursively merge `patch` into `base`
 
@@ -289,10 +306,11 @@ def merge_dict(base, patch):
 
 class Session(Model):
     """An ordered collection of materials"""
-    def __init__(self, root, path, base_course, info, index):
+    def __init__(self, root, path, base_course, info, index, course=None):
         super().__init__(root, path)
         base_name = info.get('base')
         self.index = index
+        self.course = course
         if base_name is None:
             self.info = info
         else:
@@ -308,6 +326,23 @@ class Session(Model):
     title = DataProperty(info)
     slug = DataProperty(info)
     date = DataProperty(info, default=None)
+
+    def _time(self, key, default_time):
+        if self.date and default_time:
+            return datetime.datetime.combine(self.date, default_time)
+        return None
+
+    @reify
+    def start_time(self):
+        if self.course:
+            return self._time('start', self.course.default_start_time)
+        return None
+
+    @reify
+    def end_time(self):
+        if self.course:
+            return self._time('end', self.course.default_end_time)
+        return None
 
     @reify
     def materials(self):
@@ -347,7 +382,7 @@ def _get_sessions(course, plan):
     result = OrderedDict()
     for index, sess_info in enumerate(plan):
         session = Session(course.root, course.path, course.base_course,
-                          sess_info, index=index)
+                          sess_info, index=index, course=course)
         result[session.slug] = session
 
     sessions = list(result.values())
@@ -436,6 +471,24 @@ class Course(CourseMixin, Model):
             return None
         return max(dates)
 
+    def _default_time(self, key):
+        default_time = self.info.get('default_time')
+        if default_time:
+            time_string = default_time[key]
+            hour, minute = time_string.split(':')
+            hour = int(hour)
+            minute = int(minute)
+            tzinfo = dateutil.tz.gettz(_TIMEZONE)
+            return datetime.time(hour, minute, tzinfo=tzinfo)
+        return None
+
+    @reify
+    def default_start_time(self):
+        return self._default_time('start')
+
+    @reify
+    def default_end_time(self):
+        return self._default_time('end')
 
 class CourseLink(CourseMixin, Model):
     """ A link to a course from a separate git repo
@@ -450,8 +503,8 @@ class CourseLink(CourseMixin, Model):
                         imports=["naucse.utils"])
     title = DataProperty(info)
     description = DataProperty(info)
-    start_date = DataProperty(info, convert=lambda x: datetime.strptime(x, "%Y-%m-%d").date())
-    end_date = DataProperty(info, convert=lambda x: datetime.strptime(x, "%Y-%m-%d").date())
+    start_date = DataProperty(info, convert=lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
+    end_date = DataProperty(info, convert=lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
     subtitle = DataProperty(info, default=None)
     derives = DataProperty(info, default=None)
     vars = DataProperty(info, default=None)

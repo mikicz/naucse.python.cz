@@ -1,3 +1,4 @@
+{% from "_bytesize_icons.html" import bytesize_icon %}
 <!doctype html>
 <html lang="cs">
     <head>
@@ -51,7 +52,7 @@
                 {% if edit_url is defined %}
                   <p>Uprav tuto stránku na <a href="{{ edit_url }}">{{ edit_page_name|default("GitHubu") }}</a>.</p>
                 {% else %}
-                  <p>Uprav tuto stránku na <a href="{{ edit_path|edit_link }}">GitHubu</a>.</p>
+                  <p>Uprav tuto stránku na <a href="{{ edit_path|edit_link }}">{{ bytesize_icon('github') }} GitHubu</a>.</p>
                 {% endif %}
 
                 {% if page is defined and (page.attributions or page.license) %}

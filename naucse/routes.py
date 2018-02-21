@@ -6,11 +6,12 @@ import calendar
 
 import jinja2
 from flask import Flask, render_template, url_for, send_from_directory
-from flask import abort
+from flask import abort, Response
 from jinja2 import StrictUndefined
 from jinja2.exceptions import TemplateNotFound
 from werkzeug.local import LocalProxy
 from pathlib import Path
+import ics
 
 from naucse import models
 from naucse.modelutils import arca
@@ -581,3 +582,27 @@ def course_calendar(course, content_only=False):
                            months=list_months(course.start_date,
                                               course.end_date),
                            calendar=calendar.Calendar())
+
+
+@app.route('/<course:course>/calendar.ics')
+def course_calendar_ics(course):
+    if not course.start_date:
+        abort(404)
+    calendar = ics.Calendar()
+    for session in course.sessions.values():
+        if session.start_time:
+            start_time = session.start_time
+            end_time = session.end_time
+        else:
+            abort(404)
+        cal_event = ics.Event(
+            name = session.title,
+            begin = start_time,
+            end = end_time,
+            uid = url_for("session_coverpage",
+                           course=course,
+                           session=session.slug,
+                           _external=True),
+        )
+        calendar.events.append(cal_event)
+    return Response(str(calendar), mimetype="text/calendar")
