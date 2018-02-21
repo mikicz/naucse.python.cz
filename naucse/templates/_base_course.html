@@ -22,23 +22,25 @@
         {% block course_content %}
         {% endblock %}
 
-        {% if (prv is defined and prv != None) or (nxt is defined and nxt != None) %}
+        {% if (prev_link is defined and prev_link != None) or (next_link is defined and next_link != None) %}
         <hr class="lesson-end">
 
-        {% if course is defined and not course.canonical %}
+        {% if (course is defined and not course.canonical) or (course_is_derived is defined and course_is_derived) %}
             <div class="alert alert-info">
                 Toto je stránka lekce z kurzu, který probíhá nebo proběhl naživo s instruktorem.
-                {% if course.base_course %}
-                    <a href="{{ canonical_url }}">Přejít na stejnou lekci v kurzu pro samouky</a>.
+                {% if ((course is defined and course.base_course) or (course_is_derived is defined and course_is_derived)) %}
+                    {% if canonical_url is defined and canonical_url %}
+                        <a href="{{ canonical_url }}">Přejít na stejnou lekci v kurzu pro samouky</a>.
+                    {% endif %}
                 {% endif %}
             </div>
         {% endif %}
 
+
         {% call nav.prevnext() %}
-            {% if prv is defined and prv != None %}
+            {% if prev_link is defined and prev_link %}
                 {{ nav.prev(prev_link["url"], prev_link["title"]) }}
             {% endif %}
-
             {% if session_link is defined and session_link %}
                 {{ nav.up(session_link["url"], 'Lekce: ' + session_link["title"] ) }}
             {% endif %}
