@@ -124,6 +124,9 @@ class AllowedElementsParser(HTMLParser):
             # tables
             'table', 'tbody', 'td', 'th', 'thead', 'tr',
 
+            # icons
+            'svg', 'circle', 'path',
+
             # A special check is applied in `handle_data` method (only `.dataframe` styles allowed)
             'style',
         }
