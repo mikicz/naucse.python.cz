@@ -10,6 +10,9 @@ before_script:
 script:
 - python -m pytest test_naucse
 - python -m naucse freeze
+after_script:
+- echo "Suplementary logs:"
+- cat .arca/naucse.log
 deploy:
   provider: script
   skip_cleanup: true

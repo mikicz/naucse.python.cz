@@ -1,11 +1,13 @@
 import hashlib
 import json
+import logging
 import os
 import datetime
 import calendar
 
 import jinja2
-from flask import Flask, render_template, url_for, send_from_directory
+from arca.exceptions import PullError, BuildError
+from flask import Flask, render_template, url_for, send_from_directory, request
 from flask import abort, Response
 from jinja2 import StrictUndefined
 from jinja2.exceptions import TemplateNotFound
@@ -16,16 +18,19 @@ import ics
 from naucse import models
 from naucse.models import allowed_elements_parser
 from naucse.modelutils import arca
-from naucse.routes_util import get_recent_runs, list_months, last_commit_modifying_lessons
+from naucse.routes_util import (get_recent_runs, list_months, last_commit_modifying_lessons, DisallowedStyle,
+                                DisallowedElement)
 from naucse import links_util
 from naucse.urlconverters import register_url_converters
 from naucse.templates import setup_jinja_env, vars_functions
 
 app = Flask('naucse')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+logger = logging.getLogger("naucse")
+logger.setLevel(logging.DEBUG)
 
 setup_jinja_env(app.jinja_env)
-
+POSSIBLE_FORK_EXCEPTIONS = (PullError, BuildError, DisallowedStyle, DisallowedElement)
 
 _cached_model = None
 
@@ -86,10 +91,63 @@ def index():
                            edit_path=Path("."))
 
 
+def should_raise_basic_course_problems():
+    """ Returns if naucse should ignore errors with pulling or getting basic info about courses and runs.
+        Only ignores errors when the build is on Travis in a branch used for building production site.
+    """
+    if os.environ.get("TRAVIS", "false") == "true":
+        if os.environ.get("TRAVIS_PULL_REQUEST", "false") != "false":
+            return True
+        if os.environ.get("TRAVIS_BRANCH", "") != model.meta.branch:
+            return True
+        return False
+
+    return True
+
+
+def does_course_return_info(course, extra_required=()):
+    """ Checks that the external course can be pulled and that it successfully returns basic info about the course.
+    """
+    required = ["title", "description"] + list(extra_required)
+    try:
+        if isinstance(course.info, dict) and all([x in course.info for x in required]):
+            return True
+        elif should_raise_basic_course_problems():
+            raise ValueError(f"Couldn't get basic info about the course {course.slug}, "
+                             f"the repo didn't return a dict or the required info is missing.")
+        logger.error("There was an problem getting basic info out of forked course %s. "
+                     "Suppressing, because this is the production branch.", course.slug)
+    except PullError as e:
+        if should_raise_basic_course_problems():
+            raise
+        logger.error("There was an problem either pull the forked course %s. "
+                     "Suppressing, because this is the production branch.", course.slug)
+        logger.exception(e)
+    except BuildError as e:
+        if should_raise_basic_course_problems():
+            raise
+        logger.error("There was an problem getting basic info out of forked course %s. "
+                     "Suppressing, because this is the production branch.", course.slug)
+        logger.exception(e)
+    return False
+
+
 @app.route('/runs/')
 def runs():
+    safe_years = {}
+    for year, run_years in model.run_years.items():
+        safe_run_years = []
+
+        for run in run_years.runs.values():
+            if not run.is_link():
+                safe_run_years.append(run)
+            elif does_course_return_info(run, extra_required=["start_date", "end_date"]):
+                safe_run_years.append(run)
+
+        safe_years[year] = safe_run_years
+
     return render_template("run_list.html",
-                           run_years=model.run_years,
+                           run_years=safe_years,
                            title="Seznam offline kurzů Pythonu",
                            today=datetime.date.today(),
                            edit_path=model.runs_edit_path)
@@ -97,8 +155,16 @@ def runs():
 
 @app.route('/courses/')
 def courses():
+    safe_courses = []
+
+    for course in model.courses.values():
+        if not course.is_link():
+            safe_courses.append(course)
+        elif does_course_return_info(course):
+            safe_courses.append(course)
+
     return render_template("course_list.html",
-                           courses=model.courses,
+                           courses=safe_courses,
                            title="Seznam online kurzů Pythonu",
                            edit_path=model.courses_edit_path)
 
@@ -108,7 +174,10 @@ def courses():
 def lesson_static(course, lesson, path):
     """Get the endpoint for static files in lessons.
 
+    TODO: Fix for non-canonical lessons in forks
+
     Args:
+        course  optional info about which course the static file is for
         lesson  lesson in which is the file located
         path    path to file in the static folder
 
@@ -116,7 +185,12 @@ def lesson_static(course, lesson, path):
         endpoint for the static file
     """
     if course is not None and course.is_link():
-        return send_from_directory(*course.lesson_static(lesson, path))
+        # is static file from a link, if the file cannot be retrieved use canonical file instead
+        # TODO: FIx for non-canonical lessons in forks
+        try:
+            return send_from_directory(*course.lesson_static(lesson, path))
+        except (PullError, FileNotFoundError):
+            pass
 
     directory = str(lesson.path)
     filename = os.path.join('static', path)
@@ -126,7 +200,18 @@ def lesson_static(course, lesson, path):
 @app.route('/<course:course>/')
 def course(course, content_only=False):
     if course.is_link():
-        data_from_fork = course.render_course()
+        try:
+            data_from_fork = course.render_course()
+        except POSSIBLE_FORK_EXCEPTIONS as e:
+            logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
+            logger.exception(e)
+            return render_template(
+                "error_in_fork.html",
+                malfunctioning_course=course,
+                edit_path=course.edit_path,
+                faulty_page="course",
+                root_slug=model.meta.slug
+            )
 
         try:
             course = links_util.CourseLink(data_from_fork.get("course", {}))
@@ -380,7 +465,22 @@ def course_link_page(course, lesson_slug, page, solution):
                 "content_offer": str(content_offer)
             })
 
-    data_from_fork = course.render_page(lesson_slug, page, solution, **kwargs)
+    try:
+        data_from_fork = course.render_page(lesson_slug, page, solution, **kwargs)
+    except POSSIBLE_FORK_EXCEPTIONS as e:
+        logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
+        logger.exception(e)
+        return render_template(
+            "error_in_fork.html",
+            malfunctioning_course=course,
+            edit_path=course.edit_path,
+            faulty_page="lesson",
+            lesson=lesson_slug,
+            pg=page,  # avoid name-conflict
+            solution=solution,
+            root_slug=model.meta.slug
+        )
+
     # from naucse.utils import render
     # data_from_fork = render("course_page", course.slug, lesson_slug, page, solution, **kwargs)
 
@@ -489,9 +589,22 @@ def session_coverpage(course, session, coverpage, content_only=False):
     Returns:
         rendered session coverpage
     """
-    if course.is_link():
     # if not content_only:
-        data_from_fork = course.render_session_coverpage(session, coverpage)
+    if course.is_link():
+        try:
+            data_from_fork = course.render_session_coverpage(session, coverpage)
+        except POSSIBLE_FORK_EXCEPTIONS as e:
+            logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
+            logger.exception(e)
+            return render_template(
+                "error_in_fork.html",
+                malfunctioning_course=course,
+                edit_path=course.edit_path,
+                faulty_page=f"session_{coverpage}",
+                session=session,
+                root_slug=model.meta.slug
+            )
+
         # from naucse.utils import render
         # data_from_fork = render("session_coverpage", course.slug, session, coverpage)
 
@@ -561,7 +674,18 @@ def course_calendar(course, content_only=False):
         abort(404)
 
     if course.is_link():
-        data_from_fork = course.render_calendar()
+        try:
+            data_from_fork = course.render_calendar()
+        except POSSIBLE_FORK_EXCEPTIONS as e:
+            logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
+            logger.exception(e)
+            return render_template(
+                "error_in_fork.html",
+                malfunctioning_course=course,
+                edit_path=course.edit_path,
+                faulty_page="calendar",
+                root_slug=model.meta.slug
+            )
 
         try:
             course = links_util.CourseLink(data_from_fork.get("course", {}))
@@ -615,7 +739,19 @@ def course_calendar_ics(course):
         abort(404)
 
     if course.is_link():
-        data_from_fork = course.render_calendar_ics()
+        try:
+            data_from_fork = course.render_calendar_ics()
+        except POSSIBLE_FORK_EXCEPTIONS as e:
+            logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
+            logger.exception(e)
+            return render_template(
+                "error_in_fork.html",
+                malfunctioning_course=course,
+                edit_path=course.edit_path,
+                faulty_page="calendar",
+                root_slug=model.meta.slug
+            )
+
         calendar = data_from_fork["calendar"]
     else:
         try:

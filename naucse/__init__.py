@@ -13,17 +13,26 @@ from naucse.routes import app
 
 
 def main():
-    log_path = Path(".arca/arca.log")
-    log_path.parent.mkdir(exist_ok=True)
-    log_path.touch()
+    arca_log_path = Path(".arca/arca.log")
+    arca_log_path.parent.mkdir(exist_ok=True)
+    arca_log_path.touch()
 
-    handler = RotatingFileHandler(log_path, maxBytes=10000, backupCount=0)
-    formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
+    naucse_log_path = Path(".arca/naucse.log")
+    naucse_log_path.touch()
 
-    handler.setLevel(logging.INFO)
-    handler.setFormatter(formatter)
+    def get_handler(path):
+        handler = RotatingFileHandler(path, maxBytes=10000, backupCount=0)
+        formatter = logging.Formatter("[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s")
+
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(formatter)
+
+        return handler
 
     logger = logging.getLogger("arca")
-    logger.addHandler(handler)
+    logger.addHandler(get_handler(arca_log_path))
+
+    logger = logging.getLogger("naucse")
+    logger.addHandler(get_handler(naucse_log_path))
 
     cli(app, base_url='http://naucse.poul.me', freezer=NaucseFreezer(app))
