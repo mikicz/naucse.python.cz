@@ -57,6 +57,20 @@ def serialize_license(license) -> Optional[Dict[str, str]]:
     return None
 
 
+def get_edit_icon():
+    """ Should return None or some other icon from `templates/_bytesize_icons.html` if the fork is not on GitHub.
+    """
+    return "github"
+
+
+def get_edit_page_name():
+    """ Should return the name of the page where editing is possible, in Czech in the 6th case.
+        Will be used to replace X in the sentence: `Uprav tuto stránku na X.`
+    """
+    return "GitHubu"
+
+
+
 def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
     """ Returns a rendered page for a course, based on page_type and slug.
     """
@@ -74,7 +88,11 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 "canonical": course.canonical,
                 "is_derived": course.is_derived,
             },
-            "edit_url": edit_link(course.edit_path),
+            "edit_info": {
+                "url": edit_link(course.edit_path),
+                "icon": get_edit_icon(),
+                "page_name": get_edit_page_name(),
+            }
         }
 
         if page_type == "course":

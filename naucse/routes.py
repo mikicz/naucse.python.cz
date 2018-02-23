@@ -129,12 +129,13 @@ def course(course, content_only=False):
         data_from_fork = course.render_course()
 
         try:
-            course = data_from_fork.get("course", {})
+            course = links_util.CourseLink(data_from_fork.get("course", {}))
+            edit_info = links_util.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
 
             return render_template(
                 "link/course_link.html",
-                course=links_util.CourseLink(course),
-                edit_url=data_from_fork.get("edit_url"),
+                course=course,
+                edit_info=edit_info,
                 content=data_from_fork.get("content"),
             )
         except TemplateNotFound:
@@ -387,6 +388,7 @@ def course_link_page(course, lesson_slug, page, solution):
         course = links_util.CourseLink(data_from_fork.get("course", {}))
         page = links_util.PageLink(data_from_fork.get("page", {}))
         session = links_util.SessionLink.get_session_link(data_from_fork.get("session"))
+        edit_info = links_util.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
 
         footer = data_from_fork["footer"]
         title = '{}: {}'.format(course.title, page.title)
@@ -402,7 +404,8 @@ def course_link_page(course, lesson_slug, page, solution):
             session=session,
 
             canonical_url=canonical_url,
-            edit_url=data_from_fork.get("edit_url"),
+            edit_info=edit_info,
+
             content=data_from_fork.get("content"),
 
             prev_link=footer.get("prev_link"),
@@ -495,13 +498,14 @@ def session_coverpage(course, session, coverpage, content_only=False):
         try:
             course = links_util.CourseLink(data_from_fork.get("course", {}))
             session = links_util.SessionLink.get_session_link(data_from_fork.get("session"))
+            edit_info = links_util.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
 
             return render_template(
                 "link/coverpage_link.html",
                 course=course,
                 session=session,
+                edit_info=edit_info,
 
-                edit_url=data_from_fork.get("edit_url"),
                 content=data_from_fork.get("content"),
             )
         except TemplateNotFound:
@@ -561,11 +565,12 @@ def course_calendar(course, content_only=False):
 
         try:
             course = links_util.CourseLink(data_from_fork.get("course", {}))
+            edit_info = links_util.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
 
             return render_template(
                 "link/course_calendar_link.html",
                 course=course,
-                edit_url=data_from_fork.get("edit_url"),
+                edit_info=edit_info,
                 content=data_from_fork.get("content"),
             )
         except TemplateNotFound:

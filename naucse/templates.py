@@ -46,9 +46,10 @@ def dedent(text):
 
 @template_filter()
 def edit_link(path):
+    from naucse.routes import model
     if path == Path("."):
-        return "https://github.com/pyvec/naucse.python.cz"
-    github_base = "https://github.com/pyvec/naucse.python.cz/blob/master/"
+        return f"https://github.com/{model.meta.slug}"
+    github_base = f"https://github.com/{model.meta.slug}/blob/{model.meta.branch}/"
     return github_base + str(path)
 
 

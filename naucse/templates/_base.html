@@ -49,9 +49,17 @@
         <div class="footer container">
             <hr>
             <div class="lesson-attribution">
-                {% if edit_url is defined %}
-                  <p>Uprav tuto stránku na <a href="{{ edit_url }}">{{ edit_page_name|default("GitHubu") }}</a>.</p>
-                {% else %}
+                {% if edit_info is defined and edit_info %}
+                  <p>
+                    Uprav tuto stránku na
+                    <a href="{{ edit_info.url }}">
+                      {% if edit_info.icon %}
+                        {{ bytesize_icon(edit_info.icon|default("github")) }}
+                      {% endif %}
+                      {{ edit_info.page_name|default("GitHubu") }}
+                    </a>.
+                  </p>
+                {% elif edit_info is not defined %}
                   <p>Uprav tuto stránku na <a href="{{ edit_path|edit_link }}">{{ bytesize_icon('github') }} GitHubu</a>.</p>
                 {% endif %}
 

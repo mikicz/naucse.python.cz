@@ -579,6 +579,17 @@ class License(Model):
     url = DataProperty(info)
 
 
+class MetaInfo(Model):
+
+    def __str__(self):
+        return "Meta Information"
+
+    config = YamlProperty()
+
+    slug = DataProperty(config)
+    branch = DataProperty(config)
+
+
 class Root(Model):
     """The base of the model"""
     def __init__(self, path):
@@ -598,6 +609,10 @@ class Root(Model):
             for year, run_year in self.run_years.items()
             for slug, run in run_year.runs.items()
         }
+
+    @reify
+    def meta(self):
+        return MetaInfo(self, ".")
 
     def get_lesson(self, name):
         if isinstance(name, Lesson):

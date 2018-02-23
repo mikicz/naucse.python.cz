@@ -46,3 +46,17 @@ class PageLink:
             self.license_code = LicenseLink(**page.get("license_code"))
         else:
             self.license_code = None
+
+
+class EditInfo:
+
+    @classmethod
+    def get_edit_link(cls, edit_info_data):
+        if edit_info_data is None:
+            return None
+        return EditInfo(edit_info_data)
+
+    def __init__(self, edit_info):
+        self.url = edit_info.get("url")
+        self.icon = edit_info.get("icon")
+        self.page_name = edit_info.get("page_name")
