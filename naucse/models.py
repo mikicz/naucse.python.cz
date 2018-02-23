@@ -410,10 +410,6 @@ class CourseMixin:
             parent_directory = "course" # legacy URL
         return parent_directory + "/" + directory
 
-    @reify
-    def edit_path(self):
-        return self.path.relative_to(self.root.path) / "info.yml"
-
     def is_link(self):
         return isinstance(self, CourseLink)
 
@@ -494,6 +490,7 @@ class Course(CourseMixin, Model):
     def default_end_time(self):
         return self._default_time('end')
 
+
 class CourseLink(CourseMixin, Model):
     """ A link to a course from a separate git repo
     """
@@ -559,6 +556,10 @@ class CourseLink(CourseMixin, Model):
                                         reference=Path("."), depth=-1).resolve()
 
         return filename.parent, filename.name
+
+    @reify
+    def edit_path(self):
+        return self.path.relative_to(self.root.path) / "link.yml"
 
 
 class RunYear(Model):
