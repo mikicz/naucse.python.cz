@@ -37,3 +37,44 @@ def test_allowed_elements():
         allowed_elements.reset_and_feed(
             "<div><script>alert('XSS')</script></div>"
         )
+
+
+def test_allowed_styles():
+    allowed_elements = naucse.routes_util.AllowedElementsParser()
+
+    allowed_elements.reset_and_feed(
+        """
+        <style>
+        .dataframe thead tr:only-child th {
+            text-align: right;
+        }
+
+        .course-content .green {
+            color: green;
+        }
+        </style>
+        """
+    )
+
+    # valid styles, but wrong elements
+    with pytest.raises(naucse.routes_util.DisallowedStyle):
+        allowed_elements.reset_and_feed(
+            """
+            <style>
+            .green {
+                color: green;
+            }
+            </style>
+            """
+        )
+
+    # can't parese
+    with pytest.raises(naucse.routes_util.DisallowedStyle):
+        allowed_elements.reset_and_feed(
+            """
+            <style>
+            .green {
+                color: green
+            </style>
+            """
+        )

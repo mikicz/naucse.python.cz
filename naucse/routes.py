@@ -14,6 +14,7 @@ from pathlib import Path
 import ics
 
 from naucse import models
+from naucse.models import allowed_elements_parser
 from naucse.modelutils import arca
 from naucse.routes_util import get_recent_runs, list_months, last_commit_modifying_lessons
 from naucse import links_util
@@ -387,6 +388,9 @@ def course_link_page(course, lesson_slug, page, solution):
 
         footer = data_from_fork["footer"]
         title = '{}: {}'.format(course.title, page.title)
+
+        if page.css:
+            allowed_elements_parser.validate_css(page.css)
 
         return render_template(
             "link/lesson_link.html",

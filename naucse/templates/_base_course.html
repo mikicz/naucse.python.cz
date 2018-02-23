@@ -19,8 +19,10 @@
             </header>
         {% endif %}
 
-        {% block course_content %}
-        {% endblock %}
+        <div class="course-content">
+          {% block course_content %}
+          {% endblock %}
+        </div>
 
         {% if (prev_link is defined and prev_link != None) or (next_link is defined and next_link != None) %}
         <hr class="lesson-end">

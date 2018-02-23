@@ -73,6 +73,10 @@ class DisallowedElement(Exception):
     pass
 
 
+class DisallowedStyle(Exception):
+    pass
+
+
 class AllowedElementsParser(HTMLParser):
 
     def __init__(self, **kwargs):
@@ -117,19 +121,24 @@ class AllowedElementsParser(HTMLParser):
 
     def handle_data(self, data):
         if self.current_element == "style":
-            try:
-                parsed_css = self.css_parser.parseString(data)
-            except SyntaxErr:
-                raise DisallowedElement("Style element is only allowed when it modifies .dataframe elements,"
-                                        "could not parse styles and verify.")
-            else:
-                if len(parsed_css.cssRules) == 0:
-                    return
-
-                if not all([rule.selectorText.startswith(".dataframe") for rule in parsed_css.cssRules]):
-                    raise DisallowedElement("Style element is only allowed when it modifies .dataframe elements. "
-                                            "Rendered page contains a style that modifies something else.")
+            self.validate_css(data)
 
     def reset_and_feed(self, data):
         self.reset()
         self.feed(data)
+
+    def validate_css(self, data):
+        try:
+            parsed_css = self.css_parser.parseString(data)
+        except SyntaxErr:
+            raise DisallowedStyle("Style element or page css are only allowed when they modify either the .dataframe"
+                                  " elements or things inside .course-content, could not parse styles and verify.")
+        else:
+            if len(parsed_css.cssRules) == 0:
+                return
+
+            if not all([rule.selectorText.startswith(".dataframe") or rule.selectorText.startswith(".course-content")
+                        for rule in parsed_css.cssRules]):
+                raise DisallowedStyle("Style element or page css are only allowed when they modify either the "
+                                      ".dataframe elements or things inside .course-content."
+                                      "Rendered page contains a style or page css that modifies something else.")
