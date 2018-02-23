@@ -140,5 +140,5 @@ class AllowedElementsParser(HTMLParser):
             if not all([rule.selectorText.startswith(".dataframe") or rule.selectorText.startswith(".course-content")
                         for rule in parsed_css.cssRules]):
                 raise DisallowedStyle("Style element or page css are only allowed when they modify either the "
-                                      ".dataframe elements or things inside .course-content."
+                                      ".dataframe elements or things inside .course-content. "
                                       "Rendered page contains a style or page css that modifies something else.")

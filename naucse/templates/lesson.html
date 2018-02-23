@@ -7,7 +7,7 @@
 {% endblock style %}
 
 {% block extra_links %}
-    {% if canonical_url is defined %}<link rel="canonical" href="{{ canonical_url }}" />{% endif %}
+    {% if canonical_url is defined and canonical_url %}<link rel="canonical" href="{{ canonical_url }}" />{% endif %}
 {% endblock %}
 
 {% block breadcrumbs %}

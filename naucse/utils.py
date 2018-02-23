@@ -97,7 +97,6 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
             lesson = routes.model.get_lesson(lesson_slug)
 
             info.update({
-                "canonical_url": url_for('lesson', lesson=lesson, _external=True),
                 "content": routes.course_page(course, lesson, page, solution, content_only=True, **kwargs),
             })
 

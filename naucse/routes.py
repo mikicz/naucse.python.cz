@@ -349,33 +349,35 @@ def course_link_page(course, lesson_slug, page, solution):
         2) calls Arca to run render in the fork code
         3) renders returned content here with local templates for headers, footer, etc.
     """
+    canonical_url = None
     kwargs = {}
 
     # if the page is canonical (exists in the root repository), try to retrieve it from cache (with correct variables),
     # offer it to the fork, unless the current working repo was modified
-    if not arca.is_dirty():
-        try:
-            model.get_lesson(lesson_slug)
+    try:
+        lesson = model.get_lesson(lesson_slug)
+        canonical_url = url_for('lesson', lesson=lesson, _external=True)
+    except LookupError:
+        lesson = None
 
-            content_hash = hash_content_info(
-                {
-                    "commit": last_commit_modifying_lessons(),
-                    "lesson": lesson_slug,
-                    "page": page,
-                    "solution": solution,
-                    "vars": course.vars
-                })
+    if lesson is not None and not arca.is_dirty():
 
-            content_offer = arca.region.get(content_hash)
+        content_hash = hash_content_info(
+            {
+                "commit": last_commit_modifying_lessons(),
+                "lesson": lesson_slug,
+                "page": page,
+                "solution": solution,
+                "vars": course.vars
+            })
 
-            if content_offer:
-                kwargs.update({
-                    "content_hash": content_hash,
-                    "content_offer": str(content_offer)
-                })
+        content_offer = arca.region.get(content_hash)
 
-        except LookupError:
-            pass
+        if content_offer:
+            kwargs.update({
+                "content_hash": content_hash,
+                "content_offer": str(content_offer)
+            })
 
     data_from_fork = course.render_page(lesson_slug, page, solution, **kwargs)
     # from naucse.utils import render
@@ -399,8 +401,7 @@ def course_link_page(course, lesson_slug, page, solution):
             page=page,
             session=session,
 
-            canonical_url=data_from_fork.get("canonical_url"),
-
+            canonical_url=canonical_url,
             edit_url=data_from_fork.get("edit_url"),
             content=data_from_fork.get("content"),
 
