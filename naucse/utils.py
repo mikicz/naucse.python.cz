@@ -70,8 +70,9 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
             "course": {
                 "title": course.title,
                 "url": routes.course_url(course),
-                "coach_present": course.vars["coach-present"],
-                "is_derived": course.base_course is not None
+                "vars": course.vars,
+                "canonical": course.canonical,
+                "is_derived": course.is_derived,
             },
             "edit_url": edit_link(course.edit_path),
         }
@@ -135,7 +136,10 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
             session = course.sessions.get(session_slug)
 
             info.update({
-                "session_title": session.title,
+                "session": {
+                    "title": session.title,
+                    "url": url_for("session_coverpage", course=course.slug, session=session.slug),
+                },
                 "content": routes.session_coverpage(course, session_slug, coverpage, content_only=True),
                 "edit_url": edit_link(session.get_edit_path(course, coverpage))
             })

@@ -6,32 +6,6 @@ import cssutils
 from git import Repo
 
 
-class LicenseLink:
-
-    def __init__(self, url, title):
-        self.url = url
-        self.title = title
-
-
-class PageLink:
-
-    def __init__(self, page):
-        self.css = page.get("css")
-        self.title = page.get("title")
-        self.latex = page.get("latex")
-        self.attributions = page.get("attributions")
-
-        if page.get("license"):
-            self.license = LicenseLink(**page.get("license"))
-        else:
-            self.license = None
-
-        if page.get("license_code"):
-            self.license_code = LicenseLink(**page.get("license_code"))
-        else:
-            self.license_code = None
-
-
 def get_recent_runs(course):
     """Build a list of "recent" runs based on a course.
 

@@ -450,6 +450,10 @@ class Course(CourseMixin, Model):
         return self.root.courses[name]
 
     @reify
+    def is_derived(self):
+        return self.base_course is not None
+
+    @reify
     def sessions(self):
         return _get_sessions(self, self.info['plan'])
 

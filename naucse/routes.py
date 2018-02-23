@@ -15,7 +15,8 @@ import ics
 
 from naucse import models
 from naucse.modelutils import arca
-from naucse.routes_util import get_recent_runs, PageLink, list_months, last_commit_modifying_lessons
+from naucse.routes_util import get_recent_runs, list_months, last_commit_modifying_lessons
+from naucse import links_util
 from naucse.urlconverters import register_url_converters
 from naucse.templates import setup_jinja_env, vars_functions
 
@@ -131,9 +132,7 @@ def course(course, content_only=False):
 
             return render_template(
                 "link/course_link.html",
-                title=course.get("title"),
-                course_title=course.get("title"),
-                coach_present=course.get("coach_present"),
+                course=links_util.CourseLink(course),
                 edit_url=data_from_fork.get("edit_url"),
                 content=data_from_fork.get("content"),
             )
@@ -378,30 +377,25 @@ def course_link_page(course, lesson_slug, page, solution):
             pass
 
     data_from_fork = course.render_page(lesson_slug, page, solution, **kwargs)
+    # from naucse.utils import render
     # data_from_fork = render("course_page", course.slug, lesson_slug, page, solution, **kwargs)
 
     try:
-        course = data_from_fork.get("course", {})
-        session = data_from_fork.get("session", {})
-        page = data_from_fork.get("page", {})
-        footer = data_from_fork["footer"]
+        course = links_util.CourseLink(data_from_fork.get("course", {}))
+        page = links_util.PageLink(data_from_fork.get("page", {}))
+        session = links_util.SessionLink.get_session_link(data_from_fork.get("session"))
 
-        title = '{}: {}'.format(course.get("title"), page.get("title"))
+        footer = data_from_fork["footer"]
+        title = '{}: {}'.format(course.title, page.title)
 
         return render_template(
             "link/lesson_link.html",
-            course_title=course.get("title"),
-            course_url=course.get("url"),
-            coach_present=course.get("coach_present"),
-            course_is_derived=course.get("is_derived"),
+            course=course,
             title=title,
-
-            page=PageLink(page),
+            page=page,
+            session=session,
 
             canonical_url=data_from_fork.get("canonical_url"),
-
-            session_title=session.get("title"),
-            session_url=session.get("url"),
 
             edit_url=data_from_fork.get("edit_url"),
             content=data_from_fork.get("content"),
@@ -488,21 +482,22 @@ def session_coverpage(course, session, coverpage, content_only=False):
         rendered session coverpage
     """
     if course.is_link():
+    # if not content_only:
         data_from_fork = course.render_session_coverpage(session, coverpage)
+        # from naucse.utils import render
+        # data_from_fork = render("session_coverpage", course.slug, session, coverpage)
 
         try:
-            course = data_from_fork.get("course", {})
+            course = links_util.CourseLink(data_from_fork.get("course", {}))
+            session = links_util.SessionLink.get_session_link(data_from_fork.get("session"))
 
             return render_template(
                 "link/coverpage_link.html",
-                course_title=course.get("title"),
-                course_url=course.get("url"),
+                course=course,
+                session=session,
 
-                coach_present=course.get("coach_present"),
                 edit_url=data_from_fork.get("edit_url"),
                 content=data_from_fork.get("content"),
-
-                session_title=data_from_fork.get("session_title"),
             )
         except TemplateNotFound:
             abort(404)
@@ -560,14 +555,11 @@ def course_calendar(course, content_only=False):
         data_from_fork = course.render_calendar()
 
         try:
-            course = data_from_fork.get("course", {})
+            course = links_util.CourseLink(data_from_fork.get("course", {}))
 
             return render_template(
                 "link/course_calendar_link.html",
-                course_title=course.get("title"),
-                course_url=course.get("url"),
-
-                coach_present=course.get("coach_present"),
+                course=course,
                 edit_url=data_from_fork.get("edit_url"),
                 content=data_from_fork.get("content"),
             )

@@ -11,9 +11,9 @@
 {% endblock %}
 
 {% block breadcrumbs %}
-> <a href="{{ course_url }}">{{ course_title }}</a>
-{% if session_title %}
-> <a href="{{ session_url }}">{{ session_title }}</a>
+> <a href="{{ course.url }}">{{ course.title }}</a>
+{% if session %}
+> <a href="{{ session.url }}">{{ session.title }}</a>
 {% endif %}
 > {{ page.title }}
 {% endblock %}
