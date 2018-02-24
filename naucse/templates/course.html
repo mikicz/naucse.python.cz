@@ -5,5 +5,96 @@
 {% endblock %}
 
 {% block course_content %}
-  {% include "content/course.html" %}
+<div class="row">
+    <div class="col-lg-8">
+        {% block course_overview %}
+              {% include "content/course.html" %}
+        {% endblock %}
+    </div>
+    <div class="col-lg-4">
+        {% if course.start_date %}
+            <div class="card course-card text-center">
+                <div class="card-header">
+                    Toto jsou podklady pro kurz s instruktorem
+                </div>
+                <div class="card-body">
+                    <div class="calendar-dates">
+                        {{ (course.start_date, course.end_date) | format_date_range }}
+                    </div>
+                    {% if course.default_start_time %}
+                        <div class="default-times">
+                            {{ course.default_start_time | format_time }}
+                            –
+                            {{ course.default_end_time | format_time }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer small text-left">
+                    <ul class="list-unstyled" style="margin-bottom:0;">
+                        <li>
+                            <a href="{{ url_for('course_calendar', course=course) }}">→ Kalendář</a>
+                        </li>
+                        {% if course.base_course %}
+                        <li>
+                            <a href="{{ course_url(course.base_course) }}">→ Ekvivalentní kurz pro samouky</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        {% else %}
+            <div class="card course-card">
+                <div class="card-header text-center">
+                    Toto jsou materiály pro samouky
+                </div>
+                <div class="card-body">
+                    <p>
+                        Doufáme, že naše materiály jsou srozumitelné a přínosné.
+                        Pokud ne, ozvěte se prosím:
+                    </p>
+                    <ul>
+                        <li>
+                            na <a href="https://www.facebook.com/groups/pyonieri/">Facebooku</a>,
+                        </li>
+                        <li>
+                            založením <a href="https://github.com/pyvec/naucse.python.cz/issues/new"><i>issue</i> na Githubu</a>,
+                        </li>
+                        <li>
+                            osobně na <a href="https://pyvo.cz/">srazu</a>, nebo
+                        </li>
+                        <li>
+                            <a href="mailto:django-cs@googlegroups.com">mailem</a> do
+                            <a href="https://groups.google.com/forum/#!forum/django-cs">diskusní skupiny</a>.
+                        </li>
+                    </ul>
+                    <p>
+                        Případné nejasnosti rádi vysvětlíme,
+                        ale musíme o nich vědět!
+                    </p>
+                </div>
+                {% if recent_runs %}
+                    <div class="card-footer recent-runs">
+                        Na těchto materiálech jsou založeny
+                        i kurzy s instruktorem:
+                        <ul class="list-unstyled">
+                        {% for run in recent_runs %}
+                            <li>
+                                <a href="{{ url_for('course', course=run) }}">
+                                    {{ run.title }}
+                                    {% if run.subtitle %}
+                                        – {{ run.subtitle }}
+                                    {% endif %}
+                                </a>
+                                <div>
+                                    {{ (run.start_date, run.end_date) | format_date_range }}
+                                </div>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}

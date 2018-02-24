@@ -413,6 +413,10 @@ class CourseMixin:
     def is_link(self):
         return isinstance(self, CourseLink)
 
+    @reify
+    def is_derived(self):
+        return self.base_course is not None
+
 
 class Course(CourseMixin, Model):
     """A course – ordered collection of sessions"""
@@ -431,8 +435,8 @@ class Course(CourseMixin, Model):
 
     canonical = DataProperty(info, default=False)
 
-    COURSE_INFO = ["title", "description", "vars"]
-    RUN_INFO = ["title", "description", "start_date", "end_date", "subtitle", "derives", "vars"]
+    COURSE_INFO = ["title", "description", "vars", "canonical"]
+    RUN_INFO = ["title", "description", "start_date", "end_date", "canonical", "subtitle", "derives", "vars"]
 
     @property
     def derives(self):
@@ -444,10 +448,6 @@ class Course(CourseMixin, Model):
         if name is None:
             return None
         return self.root.courses[name]
-
-    @reify
-    def is_derived(self):
-        return self.base_course is not None
 
     @reify
     def sessions(self):
@@ -509,6 +509,7 @@ class CourseLink(CourseMixin, Model):
     subtitle = DataProperty(info, default=None)
     derives = DataProperty(info, default=None)
     vars = DataProperty(info, default=None)
+    canonical = DataProperty(info, default=False)
 
     def __str__(self):
         return '{} - {}'.format(self.slug, self.title)
@@ -518,7 +519,10 @@ class CourseLink(CourseMixin, Model):
         name = self.derives
         if name is None:
             return None
-        return self.root.courses[name]
+        try:
+            return self.root.courses[name]
+        except LookupError:
+            return None
 
     def render(self, page_type, *args, **kwargs):
         task = Task(

@@ -1,8 +1,10 @@
 import datetime
+import os
 from html.parser import HTMLParser
 from xml.dom import SyntaxErr
 
 import cssutils
+from arca.exceptions import PullError, BuildError
 from git import Repo
 
 
@@ -20,8 +22,10 @@ def get_recent_runs(course):
         this_year = today.year
         for year, run_year in reversed(course.root.run_years.items()):
             for run in run_year.runs.values():
-                if run.base_course is course and run.end_date > cutoff:
-                    recent_runs.append(run)
+                if not run.is_link() or does_course_return_info(run, ["start_date", "end_date"]):
+                    if run.base_course is course and run.end_date > cutoff:
+                        recent_runs.append(run)
+
             if year < this_year:
                 # Assume no run lasts for more than a year,
                 # e.g. if it's Jan 2018, some run that started in 2017 may
@@ -142,3 +146,48 @@ class AllowedElementsParser(HTMLParser):
                 raise DisallowedStyle("Style element or page css are only allowed when they modify either the "
                                       ".dataframe elements or things inside .course-content. "
                                       "Rendered page contains a style or page css that modifies something else.")
+
+
+def should_raise_basic_course_problems():
+    """ Returns if naucse should ignore errors with pulling or getting basic info about courses and runs.
+        Only ignores errors when the build is on Travis in a branch used for building production site.
+    """
+    from naucse.routes import model
+
+    if os.environ.get("TRAVIS", "false") == "true":
+        if os.environ.get("TRAVIS_PULL_REQUEST", "false") != "false":
+            return True
+        if os.environ.get("TRAVIS_BRANCH", "") != model.meta.branch:
+            return True
+        return False
+
+    return True
+
+
+def does_course_return_info(course, extra_required=()):
+    """ Checks that the external course can be pulled and that it successfully returns basic info about the course.
+    """
+    from naucse.routes import logger
+
+    required = ["title", "description"] + list(extra_required)
+    try:
+        if isinstance(course.info, dict) and all([x in course.info for x in required]):
+            return True
+        elif should_raise_basic_course_problems():
+            raise ValueError(f"Couldn't get basic info about the course {course.slug}, "
+                             f"the repo didn't return a dict or the required info is missing.")
+        logger.error("There was an problem getting basic info out of forked course %s. "
+                     "Suppressing, because this is the production branch.", course.slug)
+    except PullError as e:
+        if should_raise_basic_course_problems():
+            raise
+        logger.error("There was an problem either pull the forked course %s. "
+                     "Suppressing, because this is the production branch.", course.slug)
+        logger.exception(e)
+    except BuildError as e:
+        if should_raise_basic_course_problems():
+            raise
+        logger.error("There was an problem getting basic info out of forked course %s. "
+                     "Suppressing, because this is the production branch.", course.slug)
+        logger.exception(e)
+    return False
