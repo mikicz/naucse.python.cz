@@ -436,7 +436,8 @@ class Course(CourseMixin, Model):
     canonical = DataProperty(info, default=False)
 
     COURSE_INFO = ["title", "description", "vars", "canonical"]
-    RUN_INFO = ["title", "description", "start_date", "end_date", "canonical", "subtitle", "derives", "vars"]
+    RUN_INFO = ["title", "description", "start_date", "end_date", "canonical", "subtitle", "derives", "vars",
+                "default_start_time", "default_end_time"]
 
     @property
     def derives(self):
@@ -491,6 +492,14 @@ class Course(CourseMixin, Model):
         return self._default_time('end')
 
 
+def optional_convert_date(x):
+    return datetime.datetime.strptime(x, "%Y-%m-%d").date() if x is not None else x
+
+
+def optional_convert_time(x):
+    return datetime.datetime.strptime(x, "%H:%M:%S").time() if x is not None else x
+
+
 class CourseLink(CourseMixin, Model):
     """ A link to a course from a separate git repo
     """
@@ -504,12 +513,14 @@ class CourseLink(CourseMixin, Model):
                         imports=["naucse.utils"])
     title = DataProperty(info)
     description = DataProperty(info)
-    start_date = DataProperty(info, convert=lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
-    end_date = DataProperty(info, convert=lambda x: datetime.datetime.strptime(x, "%Y-%m-%d").date())
+    start_date = DataProperty(info, default=None, convert=optional_convert_date)
+    end_date = DataProperty(info, default=None, convert=optional_convert_date)
     subtitle = DataProperty(info, default=None)
     derives = DataProperty(info, default=None)
     vars = DataProperty(info, default=None)
     canonical = DataProperty(info, default=False)
+    default_start_time = DataProperty(info, default=None, convert=optional_convert_time)
+    default_end_time = DataProperty(info, default=None, convert=optional_convert_time)
 
     def __str__(self):
         return '{} - {}'.format(self.slug, self.title)
