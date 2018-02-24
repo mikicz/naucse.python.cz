@@ -497,7 +497,7 @@ def optional_convert_date(x):
 
 
 def optional_convert_time(x):
-    return datetime.datetime.strptime(x, "%H-%H-%S").time() if x is not None else x
+    return datetime.datetime.strptime(x, "%H:%M:%S").time() if x is not None else x
 
 
 class CourseLink(CourseMixin, Model):
