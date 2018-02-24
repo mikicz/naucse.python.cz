@@ -14,7 +14,7 @@
       {% elif faulty_page == "session_back" %}
         Zde měla být závěrečná stránka lekce s označením <code>{{ session }}</code> pro kurz s označením <code>{{ malfunctioning_course.slug }}</code>,
       {% elif faulty_page == "lesson" %}
-        Zde měl být materilá s označením <code>{{ lesson }}</code>
+        Zde měl být materiál s označením <code>{{ lesson }}</code>
         {% if pg != "index" or solution is not none %}({% endif %}
           {% if pg != "index" %}podstránka <code>{{ pg }}</code>{% endif %}
           {% if solution is not none %}
