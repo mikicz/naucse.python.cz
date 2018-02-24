@@ -19,7 +19,7 @@ from naucse import models
 from naucse.models import allowed_elements_parser
 from naucse.modelutils import arca
 from naucse.routes_util import (get_recent_runs, list_months, last_commit_modifying_lessons, DisallowedStyle,
-                                DisallowedElement)
+                                DisallowedElement, does_course_return_info)
 from naucse import links_util
 from naucse.urlconverters import register_url_converters
 from naucse.templates import setup_jinja_env, vars_functions
@@ -91,47 +91,6 @@ def index():
                            edit_path=Path("."))
 
 
-def should_raise_basic_course_problems():
-    """ Returns if naucse should ignore errors with pulling or getting basic info about courses and runs.
-        Only ignores errors when the build is on Travis in a branch used for building production site.
-    """
-    if os.environ.get("TRAVIS", "false") == "true":
-        if os.environ.get("TRAVIS_PULL_REQUEST", "false") != "false":
-            return True
-        if os.environ.get("TRAVIS_BRANCH", "") != model.meta.branch:
-            return True
-        return False
-
-    return True
-
-
-def does_course_return_info(course, extra_required=()):
-    """ Checks that the external course can be pulled and that it successfully returns basic info about the course.
-    """
-    required = ["title", "description"] + list(extra_required)
-    try:
-        if isinstance(course.info, dict) and all([x in course.info for x in required]):
-            return True
-        elif should_raise_basic_course_problems():
-            raise ValueError(f"Couldn't get basic info about the course {course.slug}, "
-                             f"the repo didn't return a dict or the required info is missing.")
-        logger.error("There was an problem getting basic info out of forked course %s. "
-                     "Suppressing, because this is the production branch.", course.slug)
-    except PullError as e:
-        if should_raise_basic_course_problems():
-            raise
-        logger.error("There was an problem either pull the forked course %s. "
-                     "Suppressing, because this is the production branch.", course.slug)
-        logger.exception(e)
-    except BuildError as e:
-        if should_raise_basic_course_problems():
-            raise
-        logger.error("There was an problem getting basic info out of forked course %s. "
-                     "Suppressing, because this is the production branch.", course.slug)
-        logger.exception(e)
-    return False
-
-
 @app.route('/runs/')
 def runs():
     safe_years = {}
@@ -199,8 +158,11 @@ def lesson_static(course, lesson, path):
 
 @app.route('/<course:course>/')
 def course(course, content_only=False):
+    # if not content_only:
     if course.is_link():
         try:
+            # from naucse.utils import render
+            # data_from_fork = render("course", course.slug)
             data_from_fork = course.render_course()
         except POSSIBLE_FORK_EXCEPTIONS as e:
             logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
@@ -214,7 +176,6 @@ def course(course, content_only=False):
             )
 
         try:
-            course = links_util.CourseLink(data_from_fork.get("course", {}))
             edit_info = links_util.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
 
             return render_template(
@@ -222,6 +183,7 @@ def course(course, content_only=False):
                 course=course,
                 edit_info=edit_info,
                 content=data_from_fork.get("content"),
+                recent_runs=get_recent_runs(course)
             )
         except TemplateNotFound:
             abort(404)
@@ -232,14 +194,21 @@ def course(course, content_only=False):
 
         return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
 
+    if content_only:
+        template_name = 'content/course.html'
+        recent_runs = None
+    else:
+        template_name = 'course.html'
+        recent_runs = get_recent_runs(course)
+
     try:
         return render_template(
-            'course.html' if not content_only else 'content/course.html',
+            template_name,
             course=course,
             plan=course.sessions,
             title=course.title,
             lesson_url=lesson_url,
-            recent_runs=get_recent_runs(course),
+            recent_runs=recent_runs,
             **vars_functions(course.vars),
             edit_path=course.edit_path)
     except TemplateNotFound:
