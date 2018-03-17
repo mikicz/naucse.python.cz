@@ -3,15 +3,19 @@ import datetime
 
 import dateutil.tz
 import jinja2
+from arca import Task
 
-from naucse.utils.models import Model, YamlProperty, DataProperty, DirProperty
-from naucse.utils.models import reify
+from naucse.utils.models import Model, YamlProperty, DataProperty, DirProperty, MultipleModelDirProperty, ForkProperty
+from naucse.utils.models import reify, arca
+from naucse.utils.routes import AllowedElementsParser, urls_from_forks
 from naucse.templates import setup_jinja_env, vars_functions
 from naucse.utils.markdown import convert_markdown
 from naucse.utils.notebook import convert_notebook
 from pathlib import Path
 
+
 _TIMEZONE = 'Europe/Prague'
+allowed_elements_parser = AllowedElementsParser()
 
 
 class Lesson(Model):
@@ -108,6 +112,7 @@ class Page(Model):
     def render_html(self, solution=None,
                     static_url=None,
                     lesson_url=None,
+                    subpage_url=None,
                     vars=None,
                     ):
         lesson = self.lesson
@@ -134,11 +139,15 @@ class Page(Model):
                     url += '{}/'.format(solution)
                 return url
 
+        if subpage_url is None:
+            def subpage_url(page):
+                return lesson_url(lesson=lesson, page=page)
+
         kwargs = {
             'static': lambda path: static_url(path),
             'lesson_url': lambda lesson, page='index', solution=None:
                 lesson_url(lesson=lesson, page=page, solution=solution),
-            'subpage_url': lambda page: lesson_url(lesson=lesson, page=page),
+            'subpage_url': subpage_url,
             'lesson': lesson,
             'page': self,
             '$solutions': solutions,
@@ -391,7 +400,25 @@ def _get_sessions(course, plan):
     return result
 
 
-class Course(Model):
+class CourseMixin:
+
+    @reify
+    def slug(self):
+        directory = self.path.parts[-1]
+        parent_directory = self.path.parts[-2]
+        if parent_directory == "courses":
+            parent_directory = "course" # legacy URL
+        return parent_directory + "/" + directory
+
+    def is_link(self):
+        return isinstance(self, CourseLink)
+
+    @reify
+    def is_derived(self):
+        return self.base_course is not None
+
+
+class Course(CourseMixin, Model):
     """A course – ordered collection of sessions"""
     def __str__(self):
         return '{} - {}'.format(self.slug, self.title)
@@ -408,20 +435,20 @@ class Course(Model):
 
     canonical = DataProperty(info, default=False)
 
+    COURSE_INFO = ["title", "description", "vars", "canonical"]
+    RUN_INFO = ["title", "description", "start_date", "end_date", "canonical", "subtitle", "derives", "vars",
+                "default_start_time", "default_end_time"]
+
+    @property
+    def derives(self):
+        return self.info.get("derives")
+
     @reify
     def base_course(self):
         name = self.info.get('derives')
         if name is None:
             return None
         return self.root.courses[name]
-
-    @reify
-    def slug(self):
-        directory = self.path.parts[-1]
-        parent_directory = self.path.parts[-2]
-        if parent_directory == "courses":
-            parent_directory = "course" # legacy URL
-        return parent_directory + "/" + directory
 
     @reify
     def sessions(self):
@@ -465,12 +492,103 @@ class Course(Model):
         return self._default_time('end')
 
 
+def optional_convert_date(x):
+    return datetime.datetime.strptime(x, "%Y-%m-%d").date() if x is not None else x
+
+
+def optional_convert_time(x):
+    return datetime.datetime.strptime(x, "%H:%M:%S").time() if x is not None else x
+
+
+class CourseLink(CourseMixin, Model):
+    """ A link to a course from a separate git repo
+    """
+
+    link = YamlProperty()
+    repo: str = DataProperty(link)
+    branch: str = DataProperty(link)
+
+    info = ForkProperty(repo, branch, entry_point="naucse.utils.forks:course_info",
+                        args=lambda instance: [instance.slug])
+    title = DataProperty(info)
+    description = DataProperty(info)
+    start_date = DataProperty(info, default=None, convert=optional_convert_date)
+    end_date = DataProperty(info, default=None, convert=optional_convert_date)
+    subtitle = DataProperty(info, default=None)
+    derives = DataProperty(info, default=None)
+    vars = DataProperty(info, default=None)
+    canonical = DataProperty(info, default=False)
+    default_start_time = DataProperty(info, default=None, convert=optional_convert_time)
+    default_end_time = DataProperty(info, default=None, convert=optional_convert_time)
+
+    def __str__(self):
+        return 'CourseLink: {} ({})'.format(self.repo, self.branch)
+
+    @reify
+    def base_course(self):
+        name = self.derives
+        if name is None:
+            return None
+        try:
+            return self.root.courses[name]
+        except LookupError:
+            return None
+
+    @reify
+    def sessions(self):
+        # TODO: This is only used when a lesson render fails and the original page is rendered instead
+        return OrderedDict()
+
+    def render(self, page_type, *args, **kwargs):
+        task = Task(
+            "naucse.utils.forks:render",
+            args=[page_type, self.slug] + list(args),
+            kwargs=kwargs,
+        )
+        result = arca.run(self.repo, self.branch, task,
+                          reference=Path("."), depth=-1)
+
+        if page_type != "calendar_ics":
+            allowed_elements_parser.reset_and_feed(result.output["content"])
+
+        if "urls" in result.output:
+            urls_from_forks.extend(result.output["urls"])
+
+        return result.output
+
+    def render_course(self):
+        return self.render("course")
+
+    def render_calendar(self):
+        return self.render("calendar")
+
+    def render_calendar_ics(self):
+        return self.render("calendar_ics")
+
+    def render_page(self, lesson_slug, page, solution, content_hash=None, content_offer=None):
+        return self.render("course_page", lesson_slug, page, solution,
+                           content_hash=content_hash, content_offer=content_offer)
+
+    def render_session_coverpage(self, session, coverpage):
+        return self.render("session_coverpage", session, coverpage)
+
+    def lesson_static(self, lesson_slug, path):
+        filename = arca.static_filename(self.repo, self.branch, Path("lessons") / lesson_slug / "static" / path,
+                                        reference=Path("."), depth=-1).resolve()
+
+        return filename.parent, filename.name
+
+    @reify
+    def edit_path(self):
+        return self.path.relative_to(self.root.path) / "link.yml"
+
+
 class RunYear(Model):
     """A year of runs"""
     def __str__(self):
         return self.path.parts[-1]
 
-    runs = DirProperty(Course)
+    runs = MultipleModelDirProperty([("info.yml", Course), ("link.yml", CourseLink)])
 
 
 class License(Model):
@@ -483,13 +601,24 @@ class License(Model):
     url = DataProperty(info)
 
 
+class MetaInfo(Model):
+
+    def __str__(self):
+        return "Meta Information"
+
+    config = YamlProperty()
+
+    slug = DataProperty(config)
+    branch = DataProperty(config)
+
+
 class Root(Model):
     """The base of the model"""
     def __init__(self, path):
         super().__init__(self, path)
 
     collections = DirProperty(Collection, 'lessons')
-    courses = DirProperty(Course, 'courses')
+    courses = MultipleModelDirProperty([("info.yml", Course), ("link.yml", CourseLink)], 'courses')
     run_years = DirProperty(RunYear, 'runs', keyfunc=int)
     licenses = DirProperty(License, 'licenses')
     courses_edit_path = Path("courses")
@@ -503,9 +632,15 @@ class Root(Model):
             for slug, run in run_year.runs.items()
         }
 
+    @reify
+    def meta(self):
+        return MetaInfo(self, ".")
+
     def get_lesson(self, name):
         if isinstance(name, Lesson):
             return name
+        if name[-1] == "/":
+            name = name[:-1]
         collection_name, name = name.split('/', 2)
         collection = self.collections[collection_name]
         return collection.lessons[name]

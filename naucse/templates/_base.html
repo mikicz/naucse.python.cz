@@ -22,7 +22,7 @@
         <link rel="stylesheet" href="{{url_for('static', filename='css/body.css')}}">
         <link rel="stylesheet" href="{{url_for('static', filename='css/pygments-lovelace-style.css')}}">
         <link rel="stylesheet" href="{{url_for('static', filename='css/ipython.css')}}">
-
+        
         {% block extra_links %}
         {% endblock extra_links%}
 
@@ -31,7 +31,7 @@
             {% endblock %}
         </style>
     </head>
-
+    
     <body>
         <nav class="header">
             <ul class="container menu">
@@ -49,12 +49,19 @@
         <div class="footer container">
             <hr>
             <div class="lesson-attribution">
-                <p>
+                {% if edit_info is defined and edit_info %}
+                  <p>
                     Uprav tuto stránku na
-                    <a href="{{ edit_path|edit_link }}">
-                        {{ bytesize_icon('github') }}
-                        GitHubu</a>.
-                </p>
+                    <a href="{{ edit_info.url }}">
+                      {% if edit_info.icon %}
+                        {{ bytesize_icon(edit_info.icon|default("github")) }}
+                      {% endif %}
+                      {{ edit_info.page_name|default("GitHubu") }}
+                    </a>.
+                  </p>
+                {% elif edit_info is not defined %}
+                  <p>Uprav tuto stránku na <a href="{{ edit_path|edit_link }}">{{ bytesize_icon('github') }} GitHubu</a>.</p>
+                {% endif %}
 
                 {% if page is defined and (page.attributions or page.license) %}
                     {% for a in page.attributions %}
