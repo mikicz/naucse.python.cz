@@ -1,0 +1,48 @@
+title: Broken run page
+subtitle: Brno - jaro 2018 - pondělí
+time: 18:00–20:00
+default_time:
+  start: '18:00'
+  end: '20:00'
+place: Experis, BC Titanuim, Nové sady 996/25
+description: Naučte se Python vážně od začátku. Žádné předchozí znalosti nejsou potřeba.
+long_description: |
+    Tady najdeš všechny materiály k brněnské verzi začátečnického kurzu
+    PyLadies.
+
+    Stránky samotných PyLadies jsou na [http://pyladies.cz][PyLadies].
+
+    Jednotlivé lekce jsou určeny naprostým začátečnicím.
+    Instrukce jsou uvedeny pro operační systémy Linux, Windows i macOS.
+
+    [PyLadies]: http://pyladies.cz/
+derives: pyladies
+vars:
+  user-gender: f
+  pyladies: true
+  coach-present: true
+
+plan:
+- base: install
+  date: 2018-03-05
+  materials:
+  - url: http://pyladies.cz/v1/s001-install/uvod.html
+    title: Úvodní prezentace
+    type: lesson
+  - +merge
+  - title: Instrukce a domácí projekty (PDF)
+    url: http://pyladies.cz/v1/s001-install/handout/handout.pdf
+    type: homework
+
+- base: hello
+  date: 2018-03-12
+  materials:
+  - lesson: beginners/hello-world
+  - lesson: beginners/print
+  - lesson: beginners/variables
+  - lesson: beginners/comparisons
+  - title: Domácí projekty (PDF)
+    url: http://pyladies.cz/v1/s002-hello-world/handout/handout2.pdf
+    type: homework
+  - lesson: beginners/and-or
+    title: '*Nebo* anebo *a* (bonus)'

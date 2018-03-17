@@ -1,0 +1,25 @@
+title: Broken course page
+description: Naučte se Python vážně od začátku. Žádné předchozí znalosti nejsou potřeba.
+long_description: |
+
+    Zde najdeš materiály, které se používají na začátečnických kurzech PyLadies
+    v Praze, Brně a Ostravě.
+
+    Jednotlivé lekce jsou určeny naprostým začátečníkům, žádné předchozí
+    znalosti nejsou nutné. Instrukce jsou uvedeny pro operační systémy Linux,
+    Windows i macOS.
+canonical: true
+vars:
+  coach-present: false
+plan:
+- title: Instalace
+  slug: install
+  materials:
+  - lesson: beginners/cmdline
+  - lesson: beginners/install
+  - lesson: beginners/first-steps
+  - lesson: beginners/install-editor
+  - lesson: git/install
+  - title: Tahák na klávesnici (PDF)
+    url: https://pyvec.github.io/cheatsheets/keyboard/keyboard-cs.pdf
+    type: cheatsheet
