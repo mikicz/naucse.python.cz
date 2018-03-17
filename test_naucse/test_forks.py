@@ -114,7 +114,7 @@ def fork():
     run_broken_info.parent.mkdir(exist_ok=True, parents=True)
     run_broken_info.write_text(yaml.dump(generate_run("Broken run title"), default_flow_style=False))
 
-    utils = test_dir / "naucse" / "utils.py"
+    utils = test_dir / "naucse/utils" / "forks.py"
     with utils.open("w") as fl:
         fl.write("")
 
