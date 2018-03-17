@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import datetime
 
+import cssutils
 import dateutil.tz
 import jinja2
 from arca import Task
@@ -75,7 +76,22 @@ class Page(Model):
 
     @reify
     def css(self):
-        return self.info.get('css')
+        """
+        If the lesson defines extra css, the scope of the styles is limited to ``.lesson-content``,
+        a div which contains the actual lesson content. That way the styles can't disrupt
+        overall page appearance.
+        """
+        css = self.info.get("css")
+
+        if css is None:
+            return None
+
+        parsed = cssutils.parseString(css)
+
+        for rule in parsed.cssRules:
+            rule.selectorText = ".lesson-content " + rule.selectorText
+
+        return parsed.cssText.decode("utf-8")
 
     @reify
     def edit_path(self):
