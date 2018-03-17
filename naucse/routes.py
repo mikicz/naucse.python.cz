@@ -434,6 +434,11 @@ def course_link_page(course, lesson_slug, page, solution):
 
     try:
         data_from_fork = course.render_page(lesson_slug, page, solution, **kwargs)
+
+        page = links.PageLink(data_from_fork.get("page", {}))
+
+        if page.css:
+            allowed_elements_parser.validate_css(page.css)
     except POSSIBLE_FORK_EXCEPTIONS as e:
         logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
         if lesson is not None:
@@ -464,15 +469,12 @@ def course_link_page(course, lesson_slug, page, solution):
 
     try:
         course = links.CourseLink(data_from_fork.get("course", {}))
-        page = links.PageLink(data_from_fork.get("page", {}))
+
         session = links.SessionLink.get_session_link(data_from_fork.get("session"))
         edit_info = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
 
         footer = data_from_fork["footer"]
         title = '{}: {}'.format(course.title, page.title)
-
-        if page.css:
-            allowed_elements_parser.validate_css(page.css)
 
         return render_template(
             "link/lesson_link.html",
