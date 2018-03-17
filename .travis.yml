@@ -4,8 +4,7 @@ python:
 cache:
   directories:
   - $HOME/.cache/pip
-  - .arca/cache/
-- pip
+  - .arca/cache
 install:
 - pip install -r test_requirements.txt
 before_script:
