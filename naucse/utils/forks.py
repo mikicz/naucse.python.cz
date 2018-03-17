@@ -105,16 +105,19 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 })
 
             elif page_type == "calendar":
+                raise ValueError("Test exceptions")
                 info.update({
                     "content": routes.course_calendar(course, content_only=True)
                 })
 
             elif page_type == "calendar_ics":
+                raise ValueError("Test exceptions")
                 info.update({
                     "calendar": str(routes.generate_calendar_ics(course))
                 })
 
             elif page_type == "course_page":
+                raise ValueError("Test exceptions")
                 lesson_slug, page, solution, *_ = args
                 lesson = routes.model.get_lesson(lesson_slug)
                 request_url = url_for('course_page', course=course, lesson=lesson, page=page, solution=solution)
@@ -155,6 +158,7 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 }
 
             elif page_type == "session_coverpage":
+                raise ValueError("Test exceptions")
                 session_slug, coverpage, *_ = args
 
                 session = course.sessions.get(session_slug)
