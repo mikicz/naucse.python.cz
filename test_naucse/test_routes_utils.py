@@ -49,7 +49,7 @@ def test_allowed_styles():
             text-align: right;
         }
 
-        .course-content .green {
+        .lesson-content .green {
             color: green;
         }
         </style>
