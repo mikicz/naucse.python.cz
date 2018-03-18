@@ -76,7 +76,8 @@ class Page(Model):
 
     @reify
     def css(self):
-        """
+        """ Returns lesson-specific extra CSS.
+
         If the lesson defines extra css, the scope of the styles is limited to ``.lesson-content``,
         a div which contains the actual lesson content. That way the styles can't disrupt
         overall page appearance.
@@ -86,10 +87,14 @@ class Page(Model):
         if css is None:
             return None
 
-        parsed = cssutils.parseString(css)
+        parser = cssutils.CSSParser(raiseExceptions=True)
+        parsed = parser.parseString(css)
 
         for rule in parsed.cssRules:
-            rule.selectorText = ".lesson-content " + rule.selectorText
+            for selector in rule.selectorList:
+                # the space is important - there's a difference between for example
+                # ``.lesson-content:hover`` and ``.lesson-content :hover``
+                selector.selectorText = ".lesson-content " + selector.selectorText
 
         return parsed.cssText.decode("utf-8")
 
