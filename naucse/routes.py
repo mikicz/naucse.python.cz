@@ -273,7 +273,7 @@ def render_page(page, solution=None, vars=None, **kwargs):
             # this is only dangerous if the fork sets absolute path to cache and
             # CurrentEnvironmentBackend or VenvBackend are used locally
             # FIXME? But I don't think there's a way to prevent writing to a file in those backends
-            content = arca.region.get_or_create(content_key, content_creator)
+            content = arca.region.get_or_create(content_key, content_creator)["content"]
         else:
             content = content_creator()["content"]
 
