@@ -68,13 +68,37 @@ def test_allowed_styles():
             """
         )
 
-    # can't parese
+    # can't parse
     with pytest.raises(naucse.utils.routes.DisallowedStyle):
         allowed_elements.reset_and_feed(
             """
             <style>
             .green {
                 color: green
+            </style>
+            """
+        )
+
+    # multiple selectors in one rule
+    # valid:
+    allowed_elements.reset_and_feed(
+        """
+        <style>
+        .lesson-content .green, .lesson-content .also-green {
+            color: green;
+        }
+        </style>
+        """
+    )
+
+    # invalid:
+    with pytest.raises(naucse.utils.routes.DisallowedStyle):
+        allowed_elements.reset_and_feed(
+            """
+            <style>
+            .lesson-content .green, .also-green {
+                color: green;
+            }
             </style>
             """
         )
