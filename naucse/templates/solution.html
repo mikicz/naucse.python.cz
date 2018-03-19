@@ -2,10 +2,6 @@
 
 {% block course_content %}
 
-  {% if error_in_fork|default(false) %}
-    {% include "_using_default_page.html" %}
-  {% endif %}
-
   {% include "content/solution.html" %}
 
 {% endblock %}
