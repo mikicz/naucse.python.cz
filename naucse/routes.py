@@ -263,7 +263,7 @@ def render_page(page, solution=None, vars=None, **kwargs):
                 "lesson": lesson.slug,
                 "page": page.slug,
                 "solution": solution,
-                "vars": course.vars
+                "vars": course.vars if course is not None else None
             },
         )
 
