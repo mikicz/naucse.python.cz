@@ -250,13 +250,13 @@ def render_page(page, solution=None, vars=None, **kwargs):
 
     try:
         def content_creator():
-            return page.render_html(
+            return {"content": page.render_html(
                 solution=solution,
                 static_url=static_url,
                 lesson_url=kwargs.get('lesson_url', lesson_url),
                 subpage_url=kwargs.get('subpage_url', None),
                 vars=vars
-            )
+            ), "urls": []}
 
         content_key = page_content_cache_key(
             {
@@ -275,7 +275,7 @@ def render_page(page, solution=None, vars=None, **kwargs):
             # FIXME? But I don't think there's a way to prevent writing to a file in those backends
             content = arca.region.get_or_create(content_key, content_creator)
         else:
-            content = content_creator()
+            content = content_creator()["content"]
 
     except FileNotFoundError:
         abort(404)
