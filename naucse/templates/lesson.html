@@ -18,12 +18,14 @@
 > {{ page.title }}
 {% endblock %}
 
-{% block course_content %}
-
+{% block warning_msg %}
   {% if error_in_fork|default(false) %}
     {% include "_using_default_page.html" %}
   {% endif %}
+{% endblock %}
 
-  {% include "content/lesson.html" %}
+{% block course_content %}
+
+  {{ content }}
 
 {% endblock %}

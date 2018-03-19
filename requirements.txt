@@ -14,5 +14,5 @@ python-dateutil
 traitlets
 werkzeug
 git+https://github.com/mikicz/arca.git#egg=arca
-cssutils
+cssutils~=1.0
 gitpython

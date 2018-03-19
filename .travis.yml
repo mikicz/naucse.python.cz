@@ -2,7 +2,9 @@ language: python
 python:
 - '3.6'
 cache:
-- pip
+  directories:
+  - $HOME/.cache/pip
+  - .arca/cache
 install:
 - pip install -r test_requirements.txt
 before_script:
@@ -13,6 +15,7 @@ script:
 after_script:
 - echo "Suplementary logs:"
 - cat .arca/naucse.log
+- sleep 1
 deploy:
   provider: script
   skip_cleanup: true
