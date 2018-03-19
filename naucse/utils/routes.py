@@ -73,7 +73,13 @@ def last_commit_modifying_lessons(repo=None):
     if _last_commit.get(repo.git_dir):
         return _last_commit[repo.git_dir]
 
-    # git log -n 1 --format=%H lessons/ naucse/ licenses/
+    # the arca utils is equivalent to calling:
+    # git log -n 1 --format=%H lessons/ naucse/
+
+    # in theory the specific lesson from lessons could be requested, but the file has to exist
+    # and querying in base repo for last commit modifying a lesson in fork which might not even exist
+    # could fail - lessons/ is "good enough"
+
     last_commit = get_last_commit_modifying_files(repo, "lessons/", "naucse/")
 
     if not app.config['DEBUG']:
@@ -87,7 +93,13 @@ class DisallowedElement(Exception):
 
 
 class DisallowedStyle(Exception):
-    pass
+
+    COULD_NOT_PARSE = "Style element or page css are only allowed when they modify either the .dataframe" \
+                      " elements or things inside .lesson-content, could not parse styles and verify."
+
+    OUT_OF_SCOPE = "Style element or page css are only allowed when they modify either the " \
+                   ".dataframe elements or things inside .lesson-content. " \
+                   "Rendered page contains a style or page css that modifies something else."
 
 
 class AllowedElementsParser(HTMLParser):
@@ -140,21 +152,30 @@ class AllowedElementsParser(HTMLParser):
         self.reset()
         self.feed(data)
 
+    def allow_selector(self, selector: str):
+        if not selector.startswith(".lesson-content ") and not selector.startswith(".dataframe "):
+            return False
+
+        selector = selector.strip()
+
+        if selector.startswith("+") or selector.startswith("~"):
+            return False
+
+        return True
+
     def validate_css(self, data):
         try:
             parsed_css = self.css_parser.parseString(data)
         except SyntaxErr:
-            raise DisallowedStyle("Style element or page css are only allowed when they modify either the .dataframe"
-                                  " elements or things inside .course-content, could not parse styles and verify.")
+            raise DisallowedStyle(DisallowedStyle.COULD_NOT_PARSE)
         else:
             if len(parsed_css.cssRules) == 0:
                 return
 
-            if not all([rule.selectorText.startswith(".dataframe ") or rule.selectorText.startswith(".lesson-content ")
-                        for rule in parsed_css.cssRules]):
-                raise DisallowedStyle("Style element or page css are only allowed when they modify either the "
-                                      ".dataframe elements or things inside .lesson-content. "
-                                      "Rendered page contains a style or page css that modifies something else.")
+            if not all([self.allow_selector(selector.selectorText)
+                        for rule in parsed_css.cssRules
+                        for selector in rule.selectorList]):
+                raise DisallowedStyle(DisallowedStyle.OUT_OF_SCOPE)
 
 
 def should_raise_basic_course_problems():

@@ -4,6 +4,7 @@ from datetime import date, datetime, time
 from flask import url_for
 from flask_frozen import UrlForLogger
 
+from naucse.routes import page_content_cache_key
 from naucse.templates import edit_link
 from naucse import routes
 from naucse.models import Course
@@ -71,7 +72,6 @@ def get_edit_page_name():
     return "GitHubu"
 
 
-
 def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
     """ Returns a rendered page for a course, based on page_type and slug.
     """
@@ -100,21 +100,15 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
             }
 
             if page_type == "course":
-                info.update({
-                    "content": routes.course(course, content_only=True)
-                })
+                info["content"] = routes.course(course, content_only=True)
 
             elif page_type == "calendar":
                 raise ValueError("Test exceptions")
-                info.update({
-                    "content": routes.course_calendar(course, content_only=True)
-                })
+                info["content"] = routes.course_calendar(course, content_only=True)
 
             elif page_type == "calendar_ics":
                 raise ValueError("Test exceptions")
-                info.update({
-                    "calendar": str(routes.generate_calendar_ics(course))
-                })
+                info["calendar"] = str(routes.generate_calendar_ics(course))
 
             elif page_type == "course_page":
                 raise ValueError("Test exceptions")
@@ -124,16 +118,38 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
 
                 kwargs.setdefault("request_url", request_url)
 
-                info.update({
-                    "content": routes.course_page(course, lesson, page, solution, content_only=True, **kwargs),
-                })
+                content_offer_key = kwargs.get("content_key")
+                content = -1
+
+                if content_offer_key is not None:
+                    # the base repository has a cached version of the content
+                    content_key = page_content_cache_key(
+                        {
+                            "lesson": lesson_slug,
+                            "page": page,
+                            "solution": solution,
+                            "vars": course.vars
+                        }
+                    )
+
+                    # if the key matches what would be produced here, let's not return anything
+                    # and the cached version will be used
+                    if content_offer_key == content_key:
+                        content = None
+
+                # if content isn't cached or the version was refused, let's render
+                # the content here (but just the content and not the whole page with headers, menus etc)
+                if content == -1:
+                    content = routes.course_page(course, lesson, page, solution, content_only=True, **kwargs)
+
+                info["content"] = content
 
                 page, session, prv, nxt = routes.get_page(course, lesson, page)
 
                 info.update({
                     "page": {
                         "title": page.title,
-                        "css": page.css,
+                        "css": page.info.get("css"),  # not page.css since we want the css without limitation
                         "latex": page.latex,
                         "attributions": page.attributions,
                         "license": serialize_license(page.license),
