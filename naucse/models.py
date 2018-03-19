@@ -575,7 +575,7 @@ class CourseLink(CourseMixin, Model):
         result = arca.run(self.repo, self.branch, task,
                           reference=Path("."), depth=-1)
 
-        if page_type != "calendar_ics":
+        if page_type != "calendar_ics" and result.output["content"] is not None:
             allowed_elements_parser.reset_and_feed(result.output["content"])
 
         if "urls" in result.output:

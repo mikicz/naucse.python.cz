@@ -73,7 +73,13 @@ def last_commit_modifying_lessons(repo=None):
     if _last_commit.get(repo.git_dir):
         return _last_commit[repo.git_dir]
 
-    # git log -n 1 --format=%H lessons/ naucse/ licenses/
+    # the arca utils is equivalent to calling:
+    # git log -n 1 --format=%H lessons/ naucse/
+
+    # in theory the specific lesson from lessons could be requested, but the file has to exist
+    # and querying in base repo for last commit modifying a lesson in fork which might not even exist
+    # could fail - lessons/ is "good enough"
+
     last_commit = get_last_commit_modifying_files(repo, "lessons/", "naucse/")
 
     if not app.config['DEBUG']:
