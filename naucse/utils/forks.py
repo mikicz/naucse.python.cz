@@ -130,7 +130,7 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 info.update({
                     "page": {
                         "title": page.title,
-                        "css": page.css,
+                        "css": page.info.get("css"),  # not page.css since we want the css without limitation
                         "latex": page.latex,
                         "attributions": page.attributions,
                         "license": serialize_license(page.license),

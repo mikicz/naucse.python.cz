@@ -87,7 +87,13 @@ class DisallowedElement(Exception):
 
 
 class DisallowedStyle(Exception):
-    pass
+
+    COULD_NOT_PARSE = "Style element or page css are only allowed when they modify either the .dataframe" \
+                      " elements or things inside .lesson-content, could not parse styles and verify."
+
+    OUT_OF_SCOPE = "Style element or page css are only allowed when they modify either the " \
+                   ".dataframe elements or things inside .lesson-content. " \
+                   "Rendered page contains a style or page css that modifies something else."
 
 
 class AllowedElementsParser(HTMLParser):
@@ -140,23 +146,30 @@ class AllowedElementsParser(HTMLParser):
         self.reset()
         self.feed(data)
 
+    def allow_selector(self, selector: str):
+        if not selector.startswith(".lesson-content ") and not selector.startswith(".dataframe "):
+            return False
+
+        selector = selector.strip()
+
+        if selector.startswith("+") or selector.startswith("~"):
+            return False
+
+        return True
+
     def validate_css(self, data):
         try:
             parsed_css = self.css_parser.parseString(data)
         except SyntaxErr:
-            raise DisallowedStyle("Style element or page css are only allowed when they modify either the .dataframe"
-                                  " elements or things inside .course-content, could not parse styles and verify.")
+            raise DisallowedStyle(DisallowedStyle.COULD_NOT_PARSE)
         else:
             if len(parsed_css.cssRules) == 0:
                 return
 
-            if not all([(selector.selectorText.startswith(".dataframe ") or
-                         selector.selectorText.startswith(".lesson-content "))
+            if not all([self.allow_selector(selector.selectorText)
                         for rule in parsed_css.cssRules
                         for selector in rule.selectorList]):
-                raise DisallowedStyle("Style element or page css are only allowed when they modify either the "
-                                      ".dataframe elements or things inside .lesson-content. "
-                                      "Rendered page contains a style or page css that modifies something else.")
+                raise DisallowedStyle(DisallowedStyle.OUT_OF_SCOPE)
 
 
 def should_raise_basic_course_problems():

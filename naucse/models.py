@@ -87,16 +87,7 @@ class Page(Model):
         if css is None:
             return None
 
-        parser = cssutils.CSSParser(raiseExceptions=True)
-        parsed = parser.parseString(css)
-
-        for rule in parsed.cssRules:
-            for selector in rule.selectorList:
-                # the space is important - there's a difference between for example
-                # ``.lesson-content:hover`` and ``.lesson-content :hover``
-                selector.selectorText = ".lesson-content " + selector.selectorText
-
-        return parsed.cssText.decode("utf-8")
+        return self.limit_css_to_lesson_content(css)
 
     @reify
     def edit_path(self):
@@ -200,6 +191,21 @@ class Page(Model):
             return content
         else:
             return solutions[solution]
+
+    @staticmethod
+    def limit_css_to_lesson_content(css):
+        """ Returns ``css`` limited just to the ``.lesson-content`` element.
+        """
+        parser = cssutils.CSSParser(raiseExceptions=True)
+        parsed = parser.parseString(css)
+
+        for rule in parsed.cssRules:
+            for selector in rule.selectorList:
+                # the space is important - there's a difference between for example
+                # ``.lesson-content:hover`` and ``.lesson-content :hover``
+                selector.selectorText = ".lesson-content " + selector.selectorText
+
+        return parsed.cssText.decode("utf-8")
 
 
 class Collection(Model):
