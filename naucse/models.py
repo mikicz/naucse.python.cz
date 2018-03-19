@@ -592,9 +592,8 @@ class CourseLink(CourseMixin, Model):
     def render_calendar_ics(self):
         return self.render("calendar_ics")
 
-    def render_page(self, lesson_slug, page, solution, content_hash=None, content_offer=None):
-        return self.render("course_page", lesson_slug, page, solution,
-                           content_hash=content_hash, content_offer=content_offer)
+    def render_page(self, lesson_slug, page, solution, content_key=None):
+        return self.render("course_page", lesson_slug, page, solution, content_key=content_key)
 
     def render_session_coverpage(self, session, coverpage):
         return self.render("session_coverpage", session, coverpage)
