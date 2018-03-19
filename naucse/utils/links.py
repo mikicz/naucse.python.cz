@@ -1,3 +1,8 @@
+from xml.dom import SyntaxErr
+
+from naucse.models import Page
+from naucse.utils.routes import DisallowedStyle
+
 
 class CourseLink:
 
@@ -32,7 +37,6 @@ class LicenseLink:
 class PageLink:
 
     def __init__(self, page):
-        self.css = page.get("css")
         self.title = page.get("title")
         self.latex = page.get("latex")
         self.attributions = page.get("attributions")
@@ -46,6 +50,14 @@ class PageLink:
             self.license_code = LicenseLink(**page.get("license_code"))
         else:
             self.license_code = None
+
+        self.css = page.get("css")
+
+        if self.css is not None:
+            try:
+                self.css = Page.limit_css_to_lesson_content(self.css)
+            except SyntaxErr:
+                raise DisallowedStyle(DisallowedStyle.COULD_NOT_PARSE)
 
 
 class EditInfo:

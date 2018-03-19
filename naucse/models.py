@@ -76,7 +76,8 @@ class Page(Model):
 
     @reify
     def css(self):
-        """
+        """ Returns lesson-specific extra CSS.
+
         If the lesson defines extra css, the scope of the styles is limited to ``.lesson-content``,
         a div which contains the actual lesson content. That way the styles can't disrupt
         overall page appearance.
@@ -86,12 +87,7 @@ class Page(Model):
         if css is None:
             return None
 
-        parsed = cssutils.parseString(css)
-
-        for rule in parsed.cssRules:
-            rule.selectorText = ".lesson-content " + rule.selectorText
-
-        return parsed.cssText.decode("utf-8")
+        return self.limit_css_to_lesson_content(css)
 
     @reify
     def edit_path(self):
@@ -195,6 +191,21 @@ class Page(Model):
             return content
         else:
             return solutions[solution]
+
+    @staticmethod
+    def limit_css_to_lesson_content(css):
+        """ Returns ``css`` limited just to the ``.lesson-content`` element.
+        """
+        parser = cssutils.CSSParser(raiseExceptions=True)
+        parsed = parser.parseString(css)
+
+        for rule in parsed.cssRules:
+            for selector in rule.selectorList:
+                # the space is important - there's a difference between for example
+                # ``.lesson-content:hover`` and ``.lesson-content :hover``
+                selector.selectorText = ".lesson-content " + selector.selectorText
+
+        return parsed.cssText.decode("utf-8")
 
 
 class Collection(Model):
@@ -564,7 +575,7 @@ class CourseLink(CourseMixin, Model):
         result = arca.run(self.repo, self.branch, task,
                           reference=Path("."), depth=-1)
 
-        if page_type != "calendar_ics":
+        if page_type != "calendar_ics" and result.output["content"] is not None:
             allowed_elements_parser.reset_and_feed(result.output["content"])
 
         if "urls" in result.output:

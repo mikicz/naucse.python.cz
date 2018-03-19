@@ -1,11 +1,6 @@
 {% extends "lesson.html" %}
 
 {% block course_content %}
-
-  {% if error_in_fork|default(false) %}
-    {% include "_using_default_page.html" %}
-  {% endif %}
-
-  {% include "content/solution.html" %}
-
+  <h1>{{ page.title }} – Řešení [{{ solution_number }}]</h1>
+  {{ content }}
 {% endblock %}
