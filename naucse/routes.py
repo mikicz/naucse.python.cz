@@ -19,7 +19,7 @@ from naucse import models
 from naucse.models import allowed_elements_parser
 from naucse.utils.models import arca
 from naucse.utils.routes import (get_recent_runs, list_months, last_commit_modifying_lessons, DisallowedStyle,
-                                 DisallowedElement, does_course_return_info)
+                                 DisallowedElement, does_course_return_info, urls_from_forks)
 from naucse.utils import links
 from naucse.urlconverters import register_url_converters
 from naucse.templates import setup_jinja_env, vars_functions
@@ -438,9 +438,10 @@ def course_link_page(course, lesson_slug, page, solution):
         content = data_from_fork["content"]
 
         if content is None:
-            content = content_offer
+            content = content_offer["content"]
+            urls_from_forks.extend(content_offer["urls"])
         else:
-            arca.region.set(content_key, content)
+            arca.region.set(content_key, {"content": content, "urls": data_from_fork["urls"]})
 
         # get PageLink here since css parsing is in it so the exception can be caught here
         page = links.PageLink(data_from_fork.get("page", {}))
