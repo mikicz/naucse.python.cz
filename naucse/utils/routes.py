@@ -178,23 +178,21 @@ class AllowedElementsParser(HTMLParser):
                 raise DisallowedStyle(DisallowedStyle.OUT_OF_SCOPE)
 
 
-def should_raise_basic_course_problems():
-    """ Returns if naucse should ignore errors with pulling or getting basic info about courses and runs.
-        Only ignores errors when the build is on Travis in a branch used for building production site.
+def raise_errors_from_forks():
+    """ Returns if errors from forks should be raised or handled in the default way
+        Only raising when a RAISE_FORK_ERRORS environ variable is set to ``true``.
+
+        Default handling:
+
+        * Not even basic course info is returned -> Left out of the list of courses
+        * Error rendering a page
+            * Lesson - if the lesson is canonical, canonical version is rendered with a warning
+            * Everything else - templates/error_in_fork.html is rendered
     """
-    from naucse.routes import model
+    if os.environ.get("RAISE_FORK_ERRORS", "false") == "true":
+        return True
 
-    if os.environ.get("IGNORE_FORK_ERRORS", "false") == "true":
-        return False
-
-    if os.environ.get("TRAVIS", "false") == "true":
-        if os.environ.get("TRAVIS_PULL_REQUEST", "false") != "false":
-            return True
-        if os.environ.get("TRAVIS_BRANCH", "") != model.meta.branch:
-            return True
-        return False
-
-    return True
+    return False
 
 
 def does_course_return_info(course, extra_required=()):
@@ -206,19 +204,19 @@ def does_course_return_info(course, extra_required=()):
     try:
         if isinstance(course.info, dict) and all([x in course.info for x in required]):
             return True
-        elif should_raise_basic_course_problems():
+        elif raise_errors_from_forks():
             raise ValueError(f"Couldn't get basic info about the course {course.slug}, "
                              f"the repo didn't return a dict or the required info is missing.")
         logger.error("There was an problem getting basic info out of forked course %s. "
                      "Suppressing, because this is the production branch.", course.slug)
     except PullError as e:
-        if should_raise_basic_course_problems():
+        if raise_errors_from_forks():
             raise
         logger.error("There was an problem either pull the forked course %s. "
                      "Suppressing, because this is the production branch.", course.slug)
         logger.exception(e)
     except BuildError as e:
-        if should_raise_basic_course_problems():
+        if raise_errors_from_forks():
             raise
         logger.error("There was an problem getting basic info out of forked course %s. "
                      "Suppressing, because this is the production branch.", course.slug)

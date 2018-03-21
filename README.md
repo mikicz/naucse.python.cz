@@ -26,19 +26,16 @@ Nainstalovanou aplikaci spustíš následovně:
   * Linux a Mac OS:
     ```console
     $ export PYTHONPATH=.
-    $ export IGNORE_FORK_ERRORS=true
     ```
   * Windows:
     ```console
     > set PYTHONPATH=.
-    > set IGNORE_FORK_ERRORS=true
     ```
 * Spusť server:
   ```console
   $ python -m naucse serve
   ```
 * Program vypíše adresu (např. `http://0.0.0.0:8003/`); tu navštiv v prohlížeči.
-
 
 ## Testy
 

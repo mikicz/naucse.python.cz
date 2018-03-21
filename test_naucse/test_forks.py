@@ -247,14 +247,14 @@ def test_run_render(model, client: FlaskClient):
 
 
 def test_courses_page(mocker, client: FlaskClient):
-    mocker.patch("naucse.utils.routes.should_raise_basic_course_problems", lambda: True)
+    mocker.patch("naucse.utils.routes.raise_errors_from_forks", lambda: True)
 
     # there's a problem in one of the branches, it should raise error if the conditions for raising are True
     with pytest.raises(BuildError):
         client.get("/courses/")
 
     # unless problems are silenced
-    mocker.patch("naucse.utils.routes.should_raise_basic_course_problems", lambda: False)
+    mocker.patch("naucse.utils.routes.raise_errors_from_forks", lambda: False)
     response = client.get("/courses/")
     assert b"Broken course title" not in response.data
 
@@ -263,14 +263,14 @@ def test_courses_page(mocker, client: FlaskClient):
 
 
 def test_runs_page(mocker, client: FlaskClient):
-    mocker.patch("naucse.utils.routes.should_raise_basic_course_problems", lambda: True)
+    mocker.patch("naucse.utils.routes.raise_errors_from_forks", lambda: True)
 
     # there's a problem in one of the branches, it should raise error if the conditions for raising are True
     with pytest.raises(BuildError):
         client.get("/runs/")
 
     # unless problems are silenced
-    mocker.patch("naucse.utils.routes.should_raise_basic_course_problems", lambda: False)
+    mocker.patch("naucse.utils.routes.raise_errors_from_forks", lambda: False)
     response = client.get("/runs/")
     assert b"Broken run title" not in response.data
 

@@ -22,7 +22,8 @@ from naucse.urlconverters import register_url_converters
 from naucse.utils import links
 from naucse.utils.models import arca
 from naucse.utils.routes import (get_recent_runs, list_months, last_commit_modifying_lessons, DisallowedStyle,
-                                 DisallowedElement, does_course_return_info, urls_from_forks)
+                                 DisallowedElement, does_course_return_info, urls_from_forks,
+                                 raise_errors_from_forks)
 
 app = Flask('naucse')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -508,6 +509,9 @@ def course_link_page(course, lesson_slug, page, solution):
         # get PageLink here since css parsing is in it so the exception can be caught here
         page = links.PageLink(data_from_fork.get("page", {}))
     except POSSIBLE_FORK_EXCEPTIONS as e:
+        if raise_errors_from_forks():
+            raise
+
         logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
         if lesson is not None:
             try:
