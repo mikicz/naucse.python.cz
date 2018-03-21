@@ -9,7 +9,7 @@ if sys.version_info[0] <3 :
     raise RuntimeError('We love Python 3.')
 
 from elsa import cli
-from naucse.routes import app
+from naucse.routes import app, lesson_static_generator
 
 
 def main():
@@ -35,4 +35,9 @@ def main():
     logger = logging.getLogger("naucse")
     logger.addHandler(get_handler(naucse_log_path))
 
-    cli(app, base_url='http://naucse.poul.me', freezer=NaucseFreezer(app))
+    freezer = NaucseFreezer(app)
+
+    # see the generator for details
+    freezer.register_generator(lesson_static_generator)
+
+    cli(app, base_url='http://naucse.poul.me', freezer=freezer)
