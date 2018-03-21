@@ -19,7 +19,7 @@
 {% endblock %}
 
 {% block course_content %}
-  {% if solution_number|default(None) %}
+  {% if solution_number|default(None) is not none %}
     <h1>{{ page.title }} – Řešení [{{ solution_number }}]</h1>
   {% endif %}
   {{ content|safe }}
