@@ -163,6 +163,48 @@ def lesson_static(course, lesson, path):
     return send_from_directory(directory, filename)
 
 
+def lesson_static_generator_dir(lesson_slug, static_dir, search_dir):
+    """ Generates all lesson_static calls from director ``search_dir`` (yield relative to ``static_dir`` for lesson with
+    slug ``lesson_slug``).
+    """
+    if not search_dir.exists():
+        return
+
+    for static_file in search_dir.iterdir():
+
+        if static_file.is_dir():
+            yield from lesson_static_generator_dir(lesson_slug, static_dir, static_file)
+            continue
+
+        relative = static_file.relative_to(static_dir)
+
+        yield ("lesson_static", {"lesson": lesson_slug, "path": str(relative)})
+
+
+def lesson_static_generator():
+    """ Generates all static urls
+
+    When rendering naucse and nothing has been changed, almost everything comes out of cache, the URLs
+    are not registered via ``url_for`` but instead are registered as absolute urls.
+    Frozen-Flask however doesn't register the endpoints as visited when freezing absolute urls
+    and the following error is thrown.
+
+    ```
+    flask_frozen.MissingURLGeneratorWarning: Nothing frozen for endpoints lesson_static. Did you forget a URL generator?
+    ```
+
+    This generator shuts them up, generating all the urls for canonical lesson_static, including subdirectories.
+    """
+    for collection in model.collections.values():
+        for lesson in collection.lessons.values():
+            static = Path(lesson.path / "static").resolve()
+
+            if not static.exists():
+                continue
+
+            yield from lesson_static_generator_dir(lesson.slug, static, static)
+
+
 @app.route('/<course:course>/')
 def course(course, content_only=False):
     # if not content_only:
@@ -262,7 +304,9 @@ def render_page(page, solution=None, vars=None, **kwargs):
 
                 absolute_urls = [url_for(logged[0], **logged[1]) for logged in logger.logged_calls]
 
-            return {"content": content, "urls": [get_relative_url(request.path, x) for x in absolute_urls]}
+            relative_urls = [get_relative_url(request.path, x) for x in absolute_urls]
+
+            return {"content": content, "urls": relative_urls}
 
         content_key = page_content_cache_key(
             {
@@ -284,9 +328,9 @@ def render_page(page, solution=None, vars=None, **kwargs):
             # FIXME? But I don't think there's a way to prevent writing to a file in those backends
             cached = arca.region.get_or_create(content_key, content_creator)
 
-            urls_from_forks.extend(
-                [get_absolute_url(request.path, x) for x in cached["urls"]]
-            )
+            absolute_urls = [get_absolute_url(request.path, x) for x in cached["urls"]]
+
+            urls_from_forks.extend(absolute_urls)
 
             content = cached["content"]
 
