@@ -80,8 +80,12 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
     if course.is_link():
         raise ValueError("Circular dependency.")
 
+    path = []
+    if kwargs.get("request_url"):
+        path = [kwargs["request_url"]]
+
     logger = UrlForLogger(routes.app)
-    with routes.app.test_request_context():
+    with routes.app.test_request_context(*path):
         with logger:
 
             info = {
@@ -114,9 +118,6 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 raise ValueError("Test exceptions")
                 lesson_slug, page, solution, *_ = args
                 lesson = routes.model.get_lesson(lesson_slug)
-                request_url = url_for('course_page', course=course, lesson=lesson, page=page, solution=solution)
-
-                kwargs.setdefault("request_url", request_url)
 
                 content_offer_key = kwargs.get("content_key")
                 content = -1
@@ -140,9 +141,10 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 # if content isn't cached or the version was refused, let's render
                 # the content here (but just the content and not the whole page with headers, menus etc)
                 if content == -1:
-                    content = routes.course_page(course, lesson, page, solution, content_only=True, **kwargs)
+                    content = routes.course_page(course, lesson, page, solution, content_only=True)
 
-                info["content"] = content
+                info["content"] = content["content"]
+                info["content_urls"] = content["urls"]
 
                 page, session, prv, nxt = routes.get_page(course, lesson, page)
 
@@ -163,6 +165,10 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                         "title": session.title,
                         "url": url_for("session_coverpage", course=course.slug, session=session.slug)
                     }
+
+                request_url = kwargs.get("request_url")
+                if request_url is None:
+                    request_url = url_for('course_page', course=course, lesson=lesson, page=page, solution=solution)
 
                 lesson_url, *_ = routes.relative_url_functions(request_url, course, lesson)
 

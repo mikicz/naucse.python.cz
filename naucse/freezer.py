@@ -1,3 +1,5 @@
+import contextlib
+
 from elsa._shutdown import ShutdownableFreezer
 from flask_frozen import UrlForLogger
 
@@ -19,6 +21,18 @@ class AllLinksLogger(UrlForLogger):
                 yield self.logged_calls.popleft()
             if urls_from_forks:
                 yield urls_from_forks.popleft()
+
+
+@contextlib.contextmanager
+def temporary_url_for_logger(app):
+    """ A context manager which temporary adds a new UrlForLogger to the app and yields it, so it can be used
+    to get logged calls.
+    """
+    logger = UrlForLogger(app)
+
+    yield logger
+
+    app.url_default_functions[None].pop(0)
 
 
 class NaucseFreezer(ShutdownableFreezer):
