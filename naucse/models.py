@@ -5,6 +5,7 @@ import cssutils
 import dateutil.tz
 import jinja2
 from arca import Task
+from flask import request
 
 from naucse.utils.models import Model, YamlProperty, DataProperty, DirProperty, MultipleModelDirProperty, ForkProperty
 from naucse.utils.models import reify, arca
@@ -583,20 +584,20 @@ class CourseLink(CourseMixin, Model):
 
         return result.output
 
-    def render_course(self):
-        return self.render("course")
+    def render_course(self, **kwargs):
+        return self.render("course", **kwargs)
 
-    def render_calendar(self):
-        return self.render("calendar")
+    def render_calendar(self, **kwargs):
+        return self.render("calendar", **kwargs)
 
-    def render_calendar_ics(self):
-        return self.render("calendar_ics")
+    def render_calendar_ics(self, **kwargs):
+        return self.render("calendar_ics", **kwargs)
 
-    def render_page(self, lesson_slug, page, solution, content_key=None):
-        return self.render("course_page", lesson_slug, page, solution, content_key=content_key)
+    def render_page(self, lesson_slug, page, solution, content_key=None, **kwargs):
+        return self.render("course_page", lesson_slug, page, solution, content_key=content_key, **kwargs)
 
-    def render_session_coverpage(self, session, coverpage):
-        return self.render("session_coverpage", session, coverpage)
+    def render_session_coverpage(self, session, coverpage, **kwargs):
+        return self.render("session_coverpage", session, coverpage, **kwargs)
 
     def lesson_static(self, lesson_slug, path):
         filename = arca.static_filename(self.repo, self.branch, Path("lessons") / lesson_slug / "static" / path,
