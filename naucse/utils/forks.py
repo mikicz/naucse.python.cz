@@ -143,8 +143,12 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 if content == -1:
                     content = routes.course_page(course, lesson, page, solution, content_only=True)
 
-                info["content"] = content["content"]
-                info["content_urls"] = content["urls"]
+                if content is None:
+                    info["content"] = None
+                    info["content_urls"] = []
+                else:
+                    info["content"] = content["content"]
+                    info["content_urls"] = content["urls"]
 
                 page, session, prv, nxt = routes.get_page(course, lesson, page)
 
