@@ -190,7 +190,7 @@ def test_run_info(model):
     assert model.runs[(2018, "test-run")].vars.get("some-var") is False
 
 
-def test_course_render(model):
+def test_course_render(model, client: FlaskClient):
     assert model.courses["test-course"].render_course()
     with pytest.raises(BuildError):
         model.courses["test-course"].render_calendar()
@@ -201,20 +201,25 @@ def test_course_render(model):
     assert model.courses["test-course"].render_session_coverpage("first-session", "front")
     assert model.courses["test-course"].render_session_coverpage("first-session", "back")
 
-    index = model.courses["test-course"].render_page("beginners/cmdline", "index", None)
+    index = model.courses["test-course"].render_page("beginners/cmdline", "index", None,
+                                                     request_url="/course/test-course/beginners/cmdline/")
     assert index
-    solution = model.courses["test-course"].render_page("beginners/cmdline", "index", 0)
+    solution = model.courses["test-course"].render_page(
+        "beginners/cmdline", "index", 0, request_url="/course/test-course/beginners/cmdline/index/solutions/0/"
+    )
     assert solution
     assert index != solution
 
-    index = model.courses["test-course"].render_page("beginners/install", "index", None)
+    index = model.courses["test-course"].render_page("beginners/install", "index", None,
+                                                     request_url="/course/test-course/beginners/install/")
     assert index
-    linux = model.courses["test-course"].render_page("beginners/install", "linux", None)
+    linux = model.courses["test-course"].render_page("beginners/install", "linux", None,
+                                                     request_url="/course/test-course/beginners/install/linux/")
     assert linux
     assert index != linux
 
 
-def test_run_render(model):
+def test_run_render(model, client: FlaskClient):
     assert model.runs[(2018, "test-run")].render_course()
 
     assert model.runs[(2018, "test-run")].render_calendar()
@@ -223,15 +228,20 @@ def test_run_render(model):
     assert model.runs[(2018, "test-run")].render_session_coverpage("first-session", "front")
     assert model.runs[(2018, "test-run")].render_session_coverpage("first-session", "back")
 
-    index = model.runs[(2018, "test-run")].render_page("beginners/cmdline", "index", None)
+    index = model.runs[(2018, "test-run")].render_page("beginners/cmdline", "index", None,
+                                                       request_url="/2018/test-run/beginners/cmdline/")
     assert index
-    solution = model.runs[(2018, "test-run")].render_page("beginners/cmdline", "index", 0)
+    solution = model.runs[(2018, "test-run")].render_page(
+        "beginners/cmdline", "index", 0, request_url="/2018/test-run/beginners/cmdline/index/solutions/0/"
+    )
     assert solution
     assert index != solution
 
-    index = model.runs[(2018, "test-run")].render_page("beginners/install", "index", None)
+    index = model.runs[(2018, "test-run")].render_page("beginners/install", "index", None,
+                                                       request_url="/2018/test-run/beginners/install/")
     assert index
-    linux = model.runs[(2018, "test-run")].render_page("beginners/install", "linux", None)
+    linux = model.runs[(2018, "test-run")].render_page("beginners/install", "linux", None,
+                                                       request_url="/2018/test-run/beginners/install/linux/")
     assert linux
     assert index != solution
 

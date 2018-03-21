@@ -1,7 +1,6 @@
 {% extends "lesson.html" %}
 
 {% block course_content %}
-
-  {% include "content/solution.html" %}
-
+  <h1>{{ page.title }} – Řešení [{{ solution_number }}]</h1>
+  {{ content }}
 {% endblock %}
