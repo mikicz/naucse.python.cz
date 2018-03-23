@@ -13,4 +13,4 @@ pygments
 python-dateutil
 traitlets
 werkzeug
-cssutils~=1.0
+cssutils~=1.0  # frozen because of naucse.models.Page.css, see details there
