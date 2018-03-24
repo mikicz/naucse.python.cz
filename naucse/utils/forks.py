@@ -3,11 +3,13 @@ from datetime import date, datetime, time
 
 from flask import url_for
 from flask_frozen import UrlForLogger
+from git import Repo
 
 from naucse.routes import page_content_cache_key
 from naucse.templates import edit_link
 from naucse import routes
 from naucse.models import Course
+from naucse.utils.routes import last_commit_modifying_lesson
 
 
 def get_course_from_slug(slug: str) -> Course:
@@ -121,14 +123,7 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
 
                 if content_offer_key is not None:
                     # the base repository has a cached version of the content
-                    content_key = page_content_cache_key(
-                        {
-                            "lesson": lesson_slug,
-                            "page": page,
-                            "solution": solution,
-                            "vars": course.vars
-                        }
-                    )
+                    content_key = page_content_cache_key(Repo("."), lesson_slug, page, solution, course.vars)
 
                     # if the key matches what would be produced here, let's not return anything
                     # and the cached version will be used
