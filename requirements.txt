@@ -14,5 +14,5 @@ python-dateutil
 traitlets
 werkzeug
 git+https://github.com/mikicz/arca.git#egg=arca
-cssutils~=1.0
+cssutils~=1.0  # frozen because of naucse.models.Page.limit_css_to_lesson_content, see details there
 gitpython
