@@ -273,6 +273,14 @@ def test_cache_offer(model):
 
     assert result["content"] is None
 
+    # also test that if a key is provided, but a key that's gonna be rejected
+
+    result = model.courses["test-course"].render_page("beginners/cmdline", "index", None,
+                                                      content_key=content_key + "asdfasdf",
+                                                      request_url="/course/test-course/beginners/cmdline/")
+
+    assert result["content"] is not None
+
 
 def test_courses_page(mocker, client: FlaskClient):
     """ Tests how the /courses/ page behaves when a fork isn't returning information about a course.
