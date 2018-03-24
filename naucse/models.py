@@ -195,7 +195,7 @@ class Page(Model):
     @staticmethod
     def limit_css_to_lesson_content(css):
         """ Returns ``css`` limited just to the ``.lesson-content`` element.
-        
+
         This function is safe when it comes to CSS3, however there might be some selectors which could break
         the function in CSS4 (or further). The ``cssutils`` library used to parse CSS has therefore been frozen
         at 1.0 (using ~=, so minor releases are allowed) so any of the CSS4 selectors do not sneak up unexpectedly.
@@ -555,7 +555,7 @@ class CourseLink(CourseMixin, Model):
 
     link = YamlProperty()
     repo: str = DataProperty(link)
-    branch: str = DataProperty(link)
+    branch: str = DataProperty(link, default="master")
 
     info = ForkProperty(repo, branch, entry_point="naucse.utils.forks:course_info",
                         args=lambda instance: [instance.slug])
@@ -657,7 +657,7 @@ class MetaInfo(Model):
     config = YamlProperty()
 
     slug = DataProperty(config)
-    branch = DataProperty(config)
+    branch = DataProperty(config, default="master")
 
 
 class Root(Model):
