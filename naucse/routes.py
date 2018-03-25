@@ -1,7 +1,5 @@
 import calendar
 import datetime
-import hashlib
-import json
 import logging
 import os
 import urllib.parse
@@ -22,9 +20,9 @@ from naucse.templates import setup_jinja_env, vars_functions
 from naucse.urlconverters import register_url_converters
 from naucse.utils import links
 from naucse.utils.models import arca
-from naucse.utils.routes import (get_recent_runs, list_months, last_commit_modifying_naucse, DisallowedStyle,
+from naucse.utils.routes import (get_recent_runs, list_months, DisallowedStyle,
                                  DisallowedElement, does_course_return_info, urls_from_forks,
-                                 raise_errors_from_forks, last_commit_modifying_lesson)
+                                 raise_errors_from_forks, page_content_cache_key)
 
 app = Flask('naucse')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -195,7 +193,7 @@ def lesson_static_generator():
     flask_frozen.MissingURLGeneratorWarning: Nothing frozen for endpoints lesson_static. Did you forget a URL generator?
     ```
 
-    This generator shuts them up, generating all the urls for canonical lesson_static, including subdirectories.
+    This generator shuts it up, generating all the urls for canonical lesson_static, including subdirectories.
     """
     for collection in model.collections.values():
         for lesson in collection.lessons.values():
@@ -264,25 +262,6 @@ def course(course, content_only=False):
             edit_path=course.edit_path)
     except TemplateNotFound:
         abort(404)
-
-
-def page_content_cache_key(repo, lesson_slug, page, solution, vars=None) -> str:
-    """ Returns a key under which content fragments will be stored in cache, depending on the page
-    and the last commit which modified lesson rendering in ``repo``
-    """
-    return "commit:{}:content:{}".format(
-        last_commit_modifying_naucse(repo),
-        hashlib.sha1(json.dumps(
-            {
-                "lesson": lesson_slug,
-                "page": page,
-                "solution": solution,
-                "vars": vars,
-                "lesson_last_modified_by": last_commit_modifying_lesson(repo, lesson_slug),
-            },
-            sort_keys=True
-        ).encode("utf-8")).hexdigest()
-    )
 
 
 def render_page(page, solution=None, vars=None, **kwargs):

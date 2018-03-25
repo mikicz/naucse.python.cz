@@ -11,7 +11,7 @@ from flask.testing import FlaskClient
 from git import Repo
 
 from naucse import models
-from naucse.routes import page_content_cache_key
+from naucse.utils.routes import page_content_cache_key
 from naucse.utils.models import arca
 
 
