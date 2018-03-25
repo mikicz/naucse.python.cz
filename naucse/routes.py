@@ -11,6 +11,7 @@ import ics
 from arca.exceptions import PullError, BuildError
 from flask import Flask, render_template, url_for, send_from_directory, request
 from flask import abort, Response
+from git import Repo
 from jinja2 import StrictUndefined
 from jinja2.exceptions import TemplateNotFound
 from werkzeug.local import LocalProxy
@@ -21,8 +22,9 @@ from naucse.templates import setup_jinja_env, vars_functions
 from naucse.urlconverters import register_url_converters
 from naucse.utils import links
 from naucse.utils.models import arca
-from naucse.utils.routes import (get_recent_runs, list_months, last_commit_modifying_lessons, DisallowedStyle,
-                                 DisallowedElement, does_course_return_info, urls_from_forks)
+from naucse.utils.routes import (get_recent_runs, list_months, last_commit_modifying_naucse, DisallowedStyle,
+                                 DisallowedElement, does_course_return_info, urls_from_forks,
+                                 raise_errors_from_forks, last_commit_modifying_lesson)
 
 app = Flask('naucse')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -30,7 +32,7 @@ logger = logging.getLogger("naucse")
 logger.setLevel(logging.DEBUG)
 
 setup_jinja_env(app.jinja_env)
-POSSIBLE_FORK_EXCEPTIONS = (PullError, BuildError, DisallowedStyle, DisallowedElement)
+POSSIBLE_FORK_EXCEPTIONS = (PullError, BuildError, DisallowedStyle, DisallowedElement, FileNotFoundError)
 
 _cached_model = None
 
@@ -163,6 +165,48 @@ def lesson_static(course, lesson, path):
     return send_from_directory(directory, filename)
 
 
+def lesson_static_generator_dir(lesson_slug, static_dir, search_dir):
+    """ Generates all lesson_static calls from director ``search_dir`` (yield relative to ``static_dir`` for lesson with
+    slug ``lesson_slug``).
+    """
+    if not search_dir.exists():
+        return
+
+    for static_file in search_dir.iterdir():
+
+        if static_file.is_dir():
+            yield from lesson_static_generator_dir(lesson_slug, static_dir, static_file)
+            continue
+
+        relative = static_file.relative_to(static_dir)
+
+        yield ("lesson_static", {"lesson": lesson_slug, "path": str(relative)})
+
+
+def lesson_static_generator():
+    """ Generates all static urls
+
+    When rendering naucse and nothing has been changed, almost everything comes out of cache, the URLs
+    are not registered via ``url_for`` but instead are registered as absolute urls.
+    Frozen-Flask however doesn't register the endpoints as visited when freezing absolute urls
+    and the following error is thrown.
+
+    ```
+    flask_frozen.MissingURLGeneratorWarning: Nothing frozen for endpoints lesson_static. Did you forget a URL generator?
+    ```
+
+    This generator shuts them up, generating all the urls for canonical lesson_static, including subdirectories.
+    """
+    for collection in model.collections.values():
+        for lesson in collection.lessons.values():
+            static = Path(lesson.path / "static").resolve()
+
+            if not static.exists():
+                continue
+
+            yield from lesson_static_generator_dir(lesson.slug, static, static)
+
+
 @app.route('/<course:course>/')
 def course(course, content_only=False):
     # if not content_only:
@@ -222,14 +266,20 @@ def course(course, content_only=False):
         abort(404)
 
 
-def page_content_cache_key(info, repo=None) -> str:
+def page_content_cache_key(repo, lesson_slug, page, solution, vars=None) -> str:
     """ Returns a key under which content fragments will be stored in cache, depending on the page
     and the last commit which modified lesson rendering in ``repo``
     """
     return "commit:{}:content:{}".format(
-        last_commit_modifying_lessons(repo),
+        last_commit_modifying_naucse(repo),
         hashlib.sha1(json.dumps(
-            info,
+            {
+                "lesson": lesson_slug,
+                "page": page,
+                "solution": solution,
+                "vars": vars,
+                "lesson_last_modified_by": last_commit_modifying_lesson(repo, lesson_slug),
+            },
             sort_keys=True
         ).encode("utf-8")).hexdigest()
     )
@@ -262,16 +312,12 @@ def render_page(page, solution=None, vars=None, **kwargs):
 
                 absolute_urls = [url_for(logged[0], **logged[1]) for logged in logger.logged_calls]
 
-            return {"content": content, "urls": [get_relative_url(request.path, x) for x in absolute_urls]}
+            relative_urls = [get_relative_url(request.path, x) for x in absolute_urls]
 
-        content_key = page_content_cache_key(
-            {
-                "lesson": lesson.slug,
-                "page": page.slug,
-                "solution": solution,
-                "vars": course.vars if course is not None else None
-            },
-        )
+            return {"content": content, "urls": relative_urls}
+
+        content_key = page_content_cache_key(Repo("."), lesson.slug, page.slug, solution,
+                                             course.vars if course is not None else None)
 
         # only use the cache if there are no local changes and not rendering in fork
         if content_only or arca.is_dirty():
@@ -284,9 +330,9 @@ def render_page(page, solution=None, vars=None, **kwargs):
             # FIXME? But I don't think there's a way to prevent writing to a file in those backends
             cached = arca.region.get_or_create(content_key, content_creator)
 
-            urls_from_forks.extend(
-                [get_absolute_url(request.path, x) for x in cached["urls"]]
-            )
+            absolute_urls = [get_absolute_url(request.path, x) for x in cached["urls"]]
+
+            urls_from_forks.extend(absolute_urls)
 
             content = cached["content"]
 
@@ -432,23 +478,16 @@ def course_link_page(course, lesson_slug, page, solution):
 
     try:
         # checks if the rendered page content is in cache locally to offer it to the fork
-        content_key = page_content_cache_key(
-            {
-                "lesson": lesson_slug,
-                "page": page,
-                "solution": solution,
-                "vars": course.vars  # this calls ``course_info`` so it has to be in the try block
-            },
-            arca.get_repo(course.repo, course.branch)
-        )
-
+        # ``course.vars`` calls ``course_info`` so it has to be in the try block
+        # the function can also raise FileNotFoundError if the lesson doesn't exist in repo
+        content_key = page_content_cache_key(arca.get_repo(course.repo, course.branch),
+                                             lesson_slug, page, solution, course.vars)
         content_offer = arca.region.get(content_key)
 
         if content_offer:
             kwargs.update({
                 "content_key": content_key,
             })
-
 
         data_from_fork = course.render_page(lesson_slug, page, solution, **kwargs)
 
@@ -464,6 +503,9 @@ def course_link_page(course, lesson_slug, page, solution):
         # get PageLink here since css parsing is in it so the exception can be caught here
         page = links.PageLink(data_from_fork.get("page", {}))
     except POSSIBLE_FORK_EXCEPTIONS as e:
+        if raise_errors_from_forks():
+            raise
+
         logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
         if lesson is not None:
             try:

@@ -107,6 +107,7 @@ class DataProperty:
     """Value retrieved from a YamlProperty
 
     If ``key`` is not given, this property's name is used.
+    ``convert`` can be used to convert the value to something else.
     """
     def __init__(self, dict_prop, *, key=NOTHING, default=NOTHING, convert=NOTHING):
         self.dict_prop = dict_prop
@@ -129,7 +130,7 @@ class DataProperty:
         else:
             val = info.get(key, self.default)
 
-        if self.convert is NOTHING:
+        if self.convert is NOTHING or not callable(self.convert):
             return val
 
         return self.convert(val)
