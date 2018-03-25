@@ -11,6 +11,7 @@ before_script:
 - docker login -u "$DOCKER_HUB_USERNAME" -p "$DOCKER_HUB_PASSWORD"
 script:
 - python -m pytest test_naucse
+- python -m naucse list_courses
 - python -m naucse freeze
 after_script:
 - echo "Suplementary logs:"

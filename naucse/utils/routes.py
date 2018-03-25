@@ -8,7 +8,7 @@ from pathlib import Path
 from xml.dom import SyntaxErr
 
 import cssutils
-from arca.exceptions import PullError, BuildError
+from arca.exceptions import PullError, BuildError, RequirementsMismatch
 from arca.utils import get_last_commit_modifying_files
 
 urls_from_forks = deque()
@@ -216,10 +216,10 @@ def raise_errors_from_forks():
     return False
 
 
-def does_course_return_info(course, extra_required=()):
+def does_course_return_info(course, extra_required=(), *, force_ignore=False):
     """ Returns if the the external course can be pulled and that it returns basic info about the course.
 
-    Raises exception if :func:`raise_errors_from_forks` returns it should.
+    Raises exception if :func:`raise_errors_from_forks` returns it should. (But not if ``force_ignore`` is set.)
     """
     from naucse.routes import logger
 
@@ -228,17 +228,20 @@ def does_course_return_info(course, extra_required=()):
         if isinstance(course.info, dict) and all([x in course.info for x in required]):
             return True
 
-        if raise_errors_from_forks():
+        if raise_errors_from_forks() and not force_ignore:
             raise ValueError(f"Couldn't get basic info about the course {course.slug}, "
                              f"the repo didn't return a dict or the required info is missing.")
         else:
             logger.error("There was an problem getting basic info out of forked course %s. "
                          "Suppressing, because this is the production branch.", course.slug)
-    except (PullError, BuildError) as e:
-        if raise_errors_from_forks():
+    except (PullError, BuildError, RequirementsMismatch) as e:
+        if raise_errors_from_forks() and not force_ignore:
             raise
         if isinstance(e, PullError):
-            logger.error("There was an problem either pull the forked course %s. "
+            logger.error("There was an problem either pulling or cloning the forked course %s. "
+                         "Suppressing, because this is the production branch.", course.slug)
+        elif isinstance(e, RequirementsMismatch):
+            logger.error("There are some extra requirements in the forked course %s. "
                          "Suppressing, because this is the production branch.", course.slug)
         else:
             logger.error("There was an problem getting basic info out of forked course %s. "
