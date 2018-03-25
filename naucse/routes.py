@@ -221,7 +221,8 @@ def course(course, content_only=False):
                 malfunctioning_course=course,
                 edit_path=course.edit_path,
                 faulty_page="course",
-                root_slug=model.meta.slug
+                root_slug=model.meta.slug,
+                travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
         try:
@@ -333,6 +334,7 @@ def render_page(page, solution=None, vars=None, **kwargs):
     kwargs.setdefault('title', page.title)
     kwargs.setdefault('content', content)
     kwargs.setdefault('root_slug', model.meta.slug)
+    kwargs.setdefault('travis_build_id', os.environ.get("TRAVIS_BUILD_ID"))
 
     return render_template(template_name, **kwargs, **vars_functions(vars),
                            edit_path=page.edit_path)
@@ -505,7 +507,8 @@ def course_link_page(course, lesson_slug, page, solution):
             lesson=lesson_slug,
             pg=page,  # avoid name conflict
             solution=solution,
-            root_slug=model.meta.slug
+            root_slug=model.meta.slug,
+            travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
         )
 
     # from naucse.utils import render
@@ -632,7 +635,8 @@ def session_coverpage(course, session, coverpage, content_only=False):
                 edit_path=course.edit_path,
                 faulty_page=f"session_{coverpage}",
                 session=session,
-                root_slug=model.meta.slug
+                root_slug=model.meta.slug,
+                travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
         # from naucse.utils import render
@@ -711,7 +715,8 @@ def course_calendar(course, content_only=False):
                 malfunctioning_course=course,
                 edit_path=course.edit_path,
                 faulty_page="calendar",
-                root_slug=model.meta.slug
+                root_slug=model.meta.slug,
+                travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
         try:
@@ -779,7 +784,8 @@ def course_calendar_ics(course):
                 malfunctioning_course=course,
                 edit_path=course.edit_path,
                 faulty_page="calendar",
-                root_slug=model.meta.slug
+                root_slug=model.meta.slug,
+                travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
         calendar = data_from_fork["calendar"]
