@@ -1,15 +1,14 @@
-from typing import Any, Dict, Optional
 from datetime import date, datetime, time
+from typing import Any, Dict, Optional
 
 from flask import url_for
 from flask_frozen import UrlForLogger
 from git import Repo
 
-from naucse.routes import page_content_cache_key
-from naucse.templates import edit_link
 from naucse import routes
 from naucse.models import Course
-from naucse.utils.routes import last_commit_modifying_lesson
+from naucse.templates import edit_link
+from naucse.utils.routes import page_content_cache_key
 
 
 def get_course_from_slug(slug: str) -> Course:
@@ -194,7 +193,7 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
         urls = set()
         for endpoint, values in logger.iter_calls():
             url = url_for(endpoint, **values)
-            if url.startswith(f"/{slug}"):
+            if url.startswith(f"/{slug}"):  # this is checked once again in main repo, but let's save cache space
                 urls.add(url)
 
         info["urls"] = list(urls)

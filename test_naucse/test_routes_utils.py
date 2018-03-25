@@ -49,9 +49,6 @@ def test_allowed_styles():
             text-align: right;
         }
 
-        .lesson-content .green {
-            color: green;
-        }
         </style>
         """
     )
@@ -84,7 +81,7 @@ def test_allowed_styles():
     allowed_elements.reset_and_feed(
         """
         <style>
-        .lesson-content .green, .lesson-content .also-green {
+        .dataframe .green, .dataframe .also-green {
             color: green;
         }
         </style>
@@ -96,7 +93,7 @@ def test_allowed_styles():
         allowed_elements.reset_and_feed(
             """
             <style>
-            .lesson-content .green, .also-green {
+            .dataframe .green, .also-green {
                 color: green;
             }
             </style>
