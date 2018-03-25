@@ -1,7 +1,8 @@
 import datetime
 import os
-from collections import deque
+from collections import deque, defaultdict
 from html.parser import HTMLParser
+from pathlib import Path
 from xml.dom import SyntaxErr
 
 import cssutils
@@ -58,34 +59,52 @@ def list_months(start_date, end_date):
     return months
 
 
-_last_commit = {}
+_last_commit_naucse = {}
 
 
-def last_commit_modifying_lessons(repo=None):
-    """ Returns the hash of the commit which last modified either lesson contents or rendering mechanisms of naucse
-    in specified ``repo``.
+def last_commit_modifying_naucse(repo):
+    """ Returns the hash of the commit which last modified rendering mechanisms of naucse in specified ``repo``.
     """
     from naucse.routes import app
-    global _last_commit
-    if repo is None:
-        repo = Repo(".")
+    global _last_commit_naucse
 
-    if _last_commit.get(repo.git_dir):
-        return _last_commit[repo.git_dir]
+    if _last_commit_naucse.get(repo.git_dir):
+        return _last_commit_naucse[repo.git_dir]
 
-    # the arca utils is equivalent to calling:
-    # git log -n 1 --format=%H lessons/ naucse/
+    # the arca util is equivalent to calling:
+    # git log -n 1 --format=%H naucse/
 
-    # in theory the specific lesson from lessons could be requested, but the file has to exist
-    # and querying in base repo for last commit modifying a lesson in fork which might not even exist
-    # could fail - lessons/ is "good enough"
-
-    last_commit = get_last_commit_modifying_files(repo, "lessons/", "naucse/")
+    last_commit = get_last_commit_modifying_files(repo, "naucse/")
 
     if not app.config['DEBUG']:
-        _last_commit[repo.git_dir] = last_commit
+        _last_commit_naucse[repo.git_dir] = last_commit
 
     return last_commit
+
+
+_last_commit_lessons = defaultdict(dict)
+
+
+def last_commit_modifying_lesson(repo, lesson_slug):
+    """ Returns the hash of the commit which last modified specific lesson.
+    """
+    from naucse.routes import app
+
+    global _last_commit_lessons
+
+    if lesson_slug in _last_commit_lessons[repo.git_dir]:
+        return _last_commit_lessons[repo.git_dir][lesson_slug]
+
+    # ``repo.git_dir`` is path to the ``.git`` folder
+    if not (Path(repo.git_dir).parent / "lessons" / lesson_slug).exists():
+        raise FileNotFoundError
+
+    commit = get_last_commit_modifying_files(repo, "lessons/" + lesson_slug)
+
+    if not app.config['DEBUG']:
+        _last_commit_lessons[repo.git_dir][lesson_slug] = commit
+
+    return commit
 
 
 class DisallowedElement(Exception):
@@ -178,23 +197,21 @@ class AllowedElementsParser(HTMLParser):
                 raise DisallowedStyle(DisallowedStyle.OUT_OF_SCOPE)
 
 
-def should_raise_basic_course_problems():
-    """ Returns if naucse should ignore errors with pulling or getting basic info about courses and runs.
-        Only ignores errors when the build is on Travis in a branch used for building production site.
+def raise_errors_from_forks():
+    """ Returns if errors from forks should be raised or handled in the default way
+        Only raising when a RAISE_FORK_ERRORS environ variable is set to ``true``.
+
+        Default handling:
+
+        * Not even basic course info is returned -> Left out of the list of courses
+        * Error rendering a page
+            * Lesson - if the lesson is canonical, canonical version is rendered with a warning
+            * Everything else - templates/error_in_fork.html is rendered
     """
-    from naucse.routes import model
+    if os.environ.get("RAISE_FORK_ERRORS", "false") == "true":
+        return True
 
-    if os.environ.get("IGNORE_FORK_ERRORS", "false") == "true":
-        return False
-
-    if os.environ.get("TRAVIS", "false") == "true":
-        if os.environ.get("TRAVIS_PULL_REQUEST", "false") != "false":
-            return True
-        if os.environ.get("TRAVIS_BRANCH", "") != model.meta.branch:
-            return True
-        return False
-
-    return True
+    return False
 
 
 def does_course_return_info(course, extra_required=()):
@@ -206,19 +223,19 @@ def does_course_return_info(course, extra_required=()):
     try:
         if isinstance(course.info, dict) and all([x in course.info for x in required]):
             return True
-        elif should_raise_basic_course_problems():
+        elif raise_errors_from_forks():
             raise ValueError(f"Couldn't get basic info about the course {course.slug}, "
                              f"the repo didn't return a dict or the required info is missing.")
         logger.error("There was an problem getting basic info out of forked course %s. "
                      "Suppressing, because this is the production branch.", course.slug)
     except PullError as e:
-        if should_raise_basic_course_problems():
+        if raise_errors_from_forks():
             raise
         logger.error("There was an problem either pull the forked course %s. "
                      "Suppressing, because this is the production branch.", course.slug)
         logger.exception(e)
     except BuildError as e:
-        if should_raise_basic_course_problems():
+        if raise_errors_from_forks():
             raise
         logger.error("There was an problem getting basic info out of forked course %s. "
                      "Suppressing, because this is the production branch.", course.slug)
