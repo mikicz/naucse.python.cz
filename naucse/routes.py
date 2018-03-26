@@ -576,7 +576,7 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
         prev_link, session_link, next_link = get_footer_links(course, session, prv, nxt, lesson_url)
     else:
         try:
-            prev_link, session_link, next_link = course.get_footer_links(lesson, page, request_url=request.path)
+            prev_link, session_link, next_link = course.get_footer_links(lesson.slug, page, request_url=request.path)
         except POSSIBLE_FORK_EXCEPTIONS as e:
             logger.error("Could not retrieve even footer links from the fork at page %s", request.path)
             logger.exception(e)
