@@ -6,7 +6,7 @@ import urllib.parse
 from pathlib import Path
 
 import ics
-from arca.exceptions import PullError, BuildError
+from arca.exceptions import PullError, BuildError, RequirementsMismatch
 from flask import Flask, render_template, url_for, send_from_directory, request
 from flask import abort, Response
 from git import Repo
@@ -30,7 +30,8 @@ logger = logging.getLogger("naucse")
 logger.setLevel(logging.DEBUG)
 
 setup_jinja_env(app.jinja_env)
-POSSIBLE_FORK_EXCEPTIONS = (PullError, BuildError, DisallowedStyle, DisallowedElement, FileNotFoundError)
+POSSIBLE_FORK_EXCEPTIONS = (PullError, BuildError, DisallowedStyle, DisallowedElement, FileNotFoundError,
+                            RequirementsMismatch)
 
 _cached_model = None
 
@@ -490,13 +491,12 @@ def course_link_page(course, lesson_slug, page, solution):
         logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
         if lesson is not None:
             try:
+                logger.error("Rendering the canonical version with a warning.")
                 return course_page(course=course, lesson=lesson_slug, page=page, solution=solution,
                                    error_in_fork=True)
-            except:
-                logger.error("Tried to render the canonical version, that failed.")
-                pass
-            finally:
-                logger.error("Rendered the canonical version with a warning.")
+            except Exception as canonical_error:
+                logger.error("Rendering the canonical version failed.")
+                logger.exception(canonical_error)
 
         logger.exception(e)
         return render_template(
@@ -559,9 +559,9 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
         however if the course isn't a lik to a fork and the lesson doesn't exist in the current repository,
         the function returns a 404
     """
-    page_explicit = page != "index"
+    error_in_fork = kwargs.get("error_in_fork", False)
 
-    if course.is_link() and not kwargs.get("error_in_fork", False):
+    if course.is_link() and not error_in_fork:
         return course_link_page(course, lesson, page, solution)
 
     try:
@@ -569,15 +569,22 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
     except LookupError:
         abort(404)
 
-    page, session, prv, nxt = get_page(course, lesson, page)
-
     lesson_url, subpage_url, static_url = relative_url_functions(request.path, course, lesson)
 
+    if not error_in_fork:
+        page, session, prv, nxt = get_page(course, lesson, page)
+        prev_link, session_link, next_link = get_footer_links(course, session, prv, nxt, lesson_url)
+    else:
+        try:
+            prev_link, session_link, next_link = course.get_footer_links(lesson.slug, page, request_url=request.path)
+            page = lesson.pages[page]
+        except POSSIBLE_FORK_EXCEPTIONS as e:
+            logger.error("Could not retrieve even footer links from the fork at page %s", request.path)
+            logger.exception(e)
+            prev_link = session_link = next_link = None
+
     canonical_url = url_for('lesson', lesson=lesson, _external=True)
-
     title = '{}: {}'.format(course.title, page.title)
-
-    prev_link, session_link, next_link = get_footer_links(course, session, prv, nxt, lesson_url)
 
     return render_page(page=page, title=title,
                        lesson_url=lesson_url,
@@ -591,7 +598,6 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
                        session_link=session_link,
                        next_link=next_link,
                        content_only=content_only,
-                       page_explicit=page_explicit,
                        **kwargs)
 
 
