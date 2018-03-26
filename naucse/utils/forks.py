@@ -199,3 +199,33 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
         info["urls"] = list(urls)
 
     return info
+
+
+def get_footer_links(slug, lesson_slug, page, request_url=None):
+    course = get_course_from_slug(slug)
+
+    if course.is_link():
+        raise ValueError("Circular dependency.")
+
+    try:
+        lesson = routes.model.get_lesson(lesson_slug)
+    except LookupError:
+        raise ValueError("Lesson not found")
+
+    path = []
+    if request_url is not None:
+        path = [request_url]
+
+    with routes.app.test_request_context(*path):
+
+        def lesson_url(lesson, *args, **kwargs):
+            return url_for("course_page", course=course, lesson=lesson, *args, **kwargs)
+
+        page, session, prv, nxt = routes.get_page(course, lesson, page)
+        prev_link, session_link, next_link = routes.get_footer_links(course, session, prv, nxt, lesson_url)
+
+    return {
+        "prev_link": prev_link,
+        "session_link": session_link,
+        "next_link": next_link
+    }

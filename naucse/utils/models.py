@@ -8,6 +8,7 @@ Path(".arca/cache").mkdir(parents=True, exist_ok=True)
 
 arca = Arca(settings={"ARCA_BACKEND": "arca.backend.CurrentEnvironmentBackend",
                       "ARCA_BACKEND_CURRENT_ENVIRONMENT_REQUIREMENTS": "requirements.txt",
+                      "ARCA_BACKEND_REQUIREMENTS_STRATEGY": "ignore",
                       "ARCA_BACKEND_VERBOSITY": 2,
                       "ARCA_BACKEND_APK_DEPENDENCIES": ["libffi-dev"],
                       "ARCA_BACKEND_KEEP_CONTAINER_RUNNING": True,
