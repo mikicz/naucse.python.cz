@@ -1,6 +1,6 @@
 PyYAML
 ansi2html
-git+https://github.com/mikicz/elsa.git@invoke-cli#egg=elsa
+git+https://github.com/pyvec/elsa.git#egg=elsa
 flask
 frozen-flask
 ics
