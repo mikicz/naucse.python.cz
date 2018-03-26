@@ -583,11 +583,6 @@ class CourseLink(CourseMixin, Model):
         except LookupError:
             return None
 
-    @reify
-    def sessions(self):
-        # TODO: This is only used when a lesson render fails and the original page is rendered instead
-        return OrderedDict()
-
     def render(self, page_type, *args, **kwargs):
         task = Task(
             "naucse.utils.forks:render",
@@ -627,6 +622,33 @@ class CourseLink(CourseMixin, Model):
                                         reference=Path("."), depth=-1).resolve()
 
         return filename.parent, filename.name
+
+    def get_footer_links(self, lesson_slug, page, **kwargs):
+        task = Task(
+            "naucse.utils.forks:get_footer_links",
+            args=[self.slug, lesson_slug, page],
+            kwargs=kwargs
+        )
+
+        result = arca.run(self.repo, self.branch, task, reference=Path("."), depth=-1)
+
+        links = ["prev_link", "session_link", "next_link"]
+        to_return = [None, None, None]
+
+        from naucse.routes import logger
+        logger.info(result.output)
+
+        for i, link in enumerate(links):
+            to_return[i] = result.output.get(link)
+
+            if not isinstance(to_return[i], dict) or "url" not in to_return[i] or "title" not in to_return[i]:
+                to_return[i] = None
+            else:
+                urls_from_forks.extend(to_return[i]["url"])
+
+        logger.info(to_return)
+
+        return to_return
 
     @reify
     def edit_path(self):

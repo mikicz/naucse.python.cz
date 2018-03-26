@@ -1,14 +1,12 @@
 import calendar
 import datetime
-import hashlib
-import json
 import logging
 import os
 import urllib.parse
 from pathlib import Path
 
 import ics
-from arca.exceptions import PullError, BuildError
+from arca.exceptions import PullError, BuildError, RequirementsMismatch
 from flask import Flask, render_template, url_for, send_from_directory, request
 from flask import abort, Response
 from git import Repo
@@ -22,9 +20,9 @@ from naucse.templates import setup_jinja_env, vars_functions
 from naucse.urlconverters import register_url_converters
 from naucse.utils import links
 from naucse.utils.models import arca
-from naucse.utils.routes import (get_recent_runs, list_months, last_commit_modifying_naucse, DisallowedStyle,
+from naucse.utils.routes import (get_recent_runs, list_months, DisallowedStyle,
                                  DisallowedElement, does_course_return_info, urls_from_forks,
-                                 raise_errors_from_forks, last_commit_modifying_lesson)
+                                 raise_errors_from_forks, page_content_cache_key)
 
 app = Flask('naucse')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -32,7 +30,8 @@ logger = logging.getLogger("naucse")
 logger.setLevel(logging.DEBUG)
 
 setup_jinja_env(app.jinja_env)
-POSSIBLE_FORK_EXCEPTIONS = (PullError, BuildError, DisallowedStyle, DisallowedElement, FileNotFoundError)
+POSSIBLE_FORK_EXCEPTIONS = (PullError, BuildError, DisallowedStyle, DisallowedElement, FileNotFoundError,
+                            RequirementsMismatch)
 
 _cached_model = None
 
@@ -195,7 +194,7 @@ def lesson_static_generator():
     flask_frozen.MissingURLGeneratorWarning: Nothing frozen for endpoints lesson_static. Did you forget a URL generator?
     ```
 
-    This generator shuts them up, generating all the urls for canonical lesson_static, including subdirectories.
+    This generator shuts it up, generating all the urls for canonical lesson_static, including subdirectories.
     """
     for collection in model.collections.values():
         for lesson in collection.lessons.values():
@@ -223,7 +222,8 @@ def course(course, content_only=False):
                 malfunctioning_course=course,
                 edit_path=course.edit_path,
                 faulty_page="course",
-                root_slug=model.meta.slug
+                root_slug=model.meta.slug,
+                travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
         try:
@@ -264,25 +264,6 @@ def course(course, content_only=False):
             edit_path=course.edit_path)
     except TemplateNotFound:
         abort(404)
-
-
-def page_content_cache_key(repo, lesson_slug, page, solution, vars=None) -> str:
-    """ Returns a key under which content fragments will be stored in cache, depending on the page
-    and the last commit which modified lesson rendering in ``repo``
-    """
-    return "commit:{}:content:{}".format(
-        last_commit_modifying_naucse(repo),
-        hashlib.sha1(json.dumps(
-            {
-                "lesson": lesson_slug,
-                "page": page,
-                "solution": solution,
-                "vars": vars,
-                "lesson_last_modified_by": last_commit_modifying_lesson(repo, lesson_slug),
-            },
-            sort_keys=True
-        ).encode("utf-8")).hexdigest()
-    )
 
 
 def render_page(page, solution=None, vars=None, **kwargs):
@@ -354,6 +335,7 @@ def render_page(page, solution=None, vars=None, **kwargs):
     kwargs.setdefault('title', page.title)
     kwargs.setdefault('content', content)
     kwargs.setdefault('root_slug', model.meta.slug)
+    kwargs.setdefault('travis_build_id', os.environ.get("TRAVIS_BUILD_ID"))
 
     return render_template(template_name, **kwargs, **vars_functions(vars),
                            edit_path=page.edit_path)
@@ -526,7 +508,8 @@ def course_link_page(course, lesson_slug, page, solution):
             lesson=lesson_slug,
             pg=page,  # avoid name conflict
             solution=solution,
-            root_slug=model.meta.slug
+            root_slug=model.meta.slug,
+            travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
         )
 
     # from naucse.utils import render
@@ -577,9 +560,9 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
         however if the course isn't a lik to a fork and the lesson doesn't exist in the current repository,
         the function returns a 404
     """
-    page_explicit = page != "index"
+    error_in_fork = kwargs.get("error_in_fork", False)
 
-    if course.is_link() and not kwargs.get("error_in_fork", False):
+    if course.is_link() and not error_in_fork:
         return course_link_page(course, lesson, page, solution)
 
     try:
@@ -587,15 +570,22 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
     except LookupError:
         abort(404)
 
-    page, session, prv, nxt = get_page(course, lesson, page)
-
     lesson_url, subpage_url, static_url = relative_url_functions(request.path, course, lesson)
 
+    if not error_in_fork:
+        page, session, prv, nxt = get_page(course, lesson, page)
+        prev_link, session_link, next_link = get_footer_links(course, session, prv, nxt, lesson_url)
+    else:
+        try:
+            prev_link, session_link, next_link = course.get_footer_links(lesson, page, solution,
+                                                                         request_url=request.path)
+        except POSSIBLE_FORK_EXCEPTIONS as e:
+            logger.error("Could not retrieve even footer links from the fork at page %s", request.path)
+            logger.exception(e)
+            prev_link = session_link = next_link = None
+
     canonical_url = url_for('lesson', lesson=lesson, _external=True)
-
     title = '{}: {}'.format(course.title, page.title)
-
-    prev_link, session_link, next_link = get_footer_links(course, session, prv, nxt, lesson_url)
 
     return render_page(page=page, title=title,
                        lesson_url=lesson_url,
@@ -609,7 +599,6 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
                        session_link=session_link,
                        next_link=next_link,
                        content_only=content_only,
-                       page_explicit=page_explicit,
                        **kwargs)
 
 
@@ -653,7 +642,8 @@ def session_coverpage(course, session, coverpage, content_only=False):
                 edit_path=course.edit_path,
                 faulty_page=f"session_{coverpage}",
                 session=session,
-                root_slug=model.meta.slug
+                root_slug=model.meta.slug,
+                travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
         # from naucse.utils import render
@@ -732,7 +722,8 @@ def course_calendar(course, content_only=False):
                 malfunctioning_course=course,
                 edit_path=course.edit_path,
                 faulty_page="calendar",
-                root_slug=model.meta.slug
+                root_slug=model.meta.slug,
+                travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
         try:
@@ -800,7 +791,8 @@ def course_calendar_ics(course):
                 malfunctioning_course=course,
                 edit_path=course.edit_path,
                 faulty_page="calendar",
-                root_slug=model.meta.slug
+                root_slug=model.meta.slug,
+                travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
         calendar = data_from_fork["calendar"]
