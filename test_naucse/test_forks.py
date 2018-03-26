@@ -348,3 +348,58 @@ def test_failing_pages(url, client: FlaskClient):
     """
     response = client.get(url)
     assert b"alert alert-danger" in response.data
+
+
+def test_get_footer_links(model):
+    course = model.courses["test-course"]
+
+    # test first lesson of first session
+    prev_link, session_link, next_link = course.get_footer_links("beginners/cmdline", "index")
+
+    assert prev_link is None
+
+    assert isinstance(session_link, dict)
+    assert session_link["title"] == "First session"
+    assert session_link["url"] == "/course/test-course/sessions/first-session/"
+
+    assert isinstance(next_link, dict)
+    assert len(next_link["title"])  # titles are dependant on lessons content, lets just check they're there
+    assert next_link["url"] == "/course/test-course/beginners/install/"
+
+    # test last lesson of a session
+    prev_link, session_link, next_link = course.get_footer_links("beginners/install", "index")
+
+    assert isinstance(prev_link, dict)
+    assert len(prev_link["title"])  # titles are dependant on lessons content, lets just check they're there
+    assert prev_link["url"] == "/course/test-course/beginners/cmdline/"
+
+    assert isinstance(session_link, dict)
+    assert session_link["title"] == "First session"
+    assert session_link["url"] == "/course/test-course/sessions/first-session/"
+
+    assert isinstance(next_link, dict)
+    assert next_link["title"] == "Závěr lekce"
+    assert next_link["url"] == "/course/test-course/sessions/first-session/back/"
+
+    # test first lesson of a session with a previous session
+    prev_link, session_link, next_link = course.get_footer_links("beginners/first-steps", "index")
+
+    assert prev_link is None
+
+    assert isinstance(session_link, dict)
+    assert session_link["title"] == "Second session"
+    assert session_link["url"] == "/course/test-course/sessions/second-session/"
+
+    assert isinstance(next_link, dict)
+    assert len(next_link["title"])  # titles are dependant on lessons content, lets just check they're there
+    assert next_link["url"] == "/course/test-course/beginners/install-editor/"
+
+    # test nonsense lesson
+
+    with pytest.raises(BuildError):
+        course.get_footer_links("custom/non-existing", "index")
+
+    # test nonsence page
+
+    with pytest.raises(BuildError):
+        course.get_footer_links("beginners/cmdline", "some-subpage")
