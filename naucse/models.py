@@ -644,7 +644,8 @@ class CourseLink(CourseMixin, Model):
             if not isinstance(to_return[i], dict) or "url" not in to_return[i] or "title" not in to_return[i]:
                 to_return[i] = None
             else:
-                urls_from_forks.extend(to_return[i]["url"])
+                if to_return[i]["url"].startswith(f"/{self.slug}/"):
+                    urls_from_forks.append(to_return[i]["url"])
 
         logger.info(to_return)
 

@@ -491,13 +491,12 @@ def course_link_page(course, lesson_slug, page, solution):
         logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
         if lesson is not None:
             try:
+                logger.error("Rendering the canonical version with a warning.")
                 return course_page(course=course, lesson=lesson_slug, page=page, solution=solution,
                                    error_in_fork=True)
-            except:
-                logger.error("Tried to render the canonical version, that failed.")
-                pass
-            finally:
-                logger.error("Rendered the canonical version with a warning.")
+            except Exception as canonical_error:
+                logger.error("Rendering the canonical version failed.")
+                logger.exception(canonical_error)
 
         logger.exception(e)
         return render_template(
@@ -577,8 +576,8 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
         prev_link, session_link, next_link = get_footer_links(course, session, prv, nxt, lesson_url)
     else:
         try:
-            prev_link, session_link, next_link = course.get_footer_links(lesson, page, solution,
-                                                                         request_url=request.path)
+            prev_link, session_link, next_link = course.get_footer_links(lesson.slug, page, request_url=request.path)
+            page = lesson.pages[page]
         except POSSIBLE_FORK_EXCEPTIONS as e:
             logger.error("Could not retrieve even footer links from the fork at page %s", request.path)
             logger.exception(e)
