@@ -49,8 +49,7 @@ def edit_link(path):
     from naucse.routes import model
     if path == Path("."):
         return f"https://github.com/{model.meta.slug}"
-    github_base = f"https://github.com/{model.meta.slug}/blob/{model.meta.branch}/"
-    return github_base + str(path)
+    return f"https://github.com/{model.meta.slug}/blob/{model.meta.branch}/{str(path)}"
 
 
 @template_filter()

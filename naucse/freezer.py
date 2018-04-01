@@ -3,30 +3,28 @@ import contextlib
 from elsa._shutdown import ShutdownableFreezer
 from flask_frozen import UrlForLogger
 
-from naucse.utils.routes import urls_from_forks
+from naucse.utils.routes import absolute_urls_to_freeze
 
 
 class AllLinksLogger(UrlForLogger):
-    """ AllLinksLogger logs both `url_for` calls and urls parsed from content (either returned from Arca or built,
-        locally). The `iter_calls` method yields primarily urls from `url_for`, because they're more likely to be
-        the ones, whose cached content will be later used in parsed urls.
+    """ AllLinksLogger primarily logs ``url_for`` calls, but yields urls from  ``absolute_urls_to_freeze`` as well.
     """
 
     def iter_calls(self):
         """ Yields all logged urls and links parsed from content.
-            Unfortunately, `yield from` cannot be used as the queues are modified on the go
+            Unfortunately, ``yield from`` cannot be used as the queues are modified on the go.
         """
-        while self.logged_calls or urls_from_forks:
+        while self.logged_calls or absolute_urls_to_freeze:
             if self.logged_calls:
                 yield self.logged_calls.popleft()
-            if urls_from_forks:
-                yield urls_from_forks.popleft()
+            if absolute_urls_to_freeze:
+                yield absolute_urls_to_freeze.popleft()
 
 
 @contextlib.contextmanager
 def temporary_url_for_logger(app):
     """ A context manager which temporary adds a new UrlForLogger to the app and yields it, so it can be used
-    to get logged calls.
+        to get logged calls.
     """
     logger = UrlForLogger(app)
 

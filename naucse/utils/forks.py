@@ -190,6 +190,7 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
             else:
                 raise ValueError("Invalid page type.")
 
+        # generate list of absolute urls which need to be frozen further
         urls = set()
         for endpoint, values in logger.iter_calls():
             url = url_for(endpoint, **values)

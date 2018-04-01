@@ -77,7 +77,7 @@ class ForkProperty(LazyProperty):
     """ Populated from the fork the model is pointing to.
 
     ``repo`` and ``branch`` indicate from which attribute of the instance the property should take info about the fork.
-    ``**kwargs`` are for `arca.Task` - the values can be callable (they get instance as a parameter)
+    ``**kwargs`` are for `arca.Task` - the values can be callable (they get the instance as a parameter)
     """
     def __init__(self, repo, branch, **kwargs):
         self.repo_prop = repo
