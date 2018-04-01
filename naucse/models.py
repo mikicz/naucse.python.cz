@@ -195,28 +195,8 @@ class Page(Model):
     @staticmethod
     def limit_css_to_lesson_content(css):
         """ Returns ``css`` limited just to the ``.lesson-content`` element.
-
-        This function is safe when it comes to CSS3, however there might be some selectors which could break
-        the function in CSS4 (or further). The ``cssutils`` library used to parse CSS has therefore been frozen
-        at 1.0 (using ~=, so minor releases are allowed) so any of the CSS4 selectors do not sneak up unexpectedly.
-        However, according to https://css4-selectors.com/selectors/, none of the currently proposed
-        CSS4 selectors would break this function when combined with second implementation detail bellow.
-
-        The safety comes in from two details:
-
-        1) The ``CSSParser`` setting to raise exceptions, so, for example if the attacker wanted to modify
-        the styles of the element after ``.lesson-content`` (with ``.lesson-content + *``), the ``info["css"]``
-        would have to be the following, however that doesn't pass ``cssutils`` validation.
-
-        ```
-        + * {
-            rule: value;
-        }
-        ```
-
-        2) As long there's a space after ``.lesson-content``, ale the rules are only applied the children of
-        that div. This is illustrated for example by the difference between ``.lesson-content:hover``
-        and ``.lesson-content :hover``, the same applies for other selectors.
+   
+        This doesn't protect against malicious input.
         """
         parser = cssutils.CSSParser(raiseExceptions=True)
         parsed = parser.parseString(css)

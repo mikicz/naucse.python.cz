@@ -1,6 +1,6 @@
 PyYAML
 ansi2html
-git+https://github.com/pyvec/elsa.git#egg=elsa
+elsa>=0.1.4
 flask
 frozen-flask
 ics
@@ -14,7 +14,8 @@ python-dateutil
 traitlets
 werkzeug
 git+https://github.com/mikicz/arca.git#egg=arca
-cssutils~=1.0  # frozen because of naucse.models.Page.limit_css_to_lesson_content, see details there
+cssutils
 gitpython
 click
 colorama
+
