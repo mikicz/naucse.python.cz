@@ -11,7 +11,8 @@ arca = Arca(settings={"ARCA_BACKEND": "arca.backend.CurrentEnvironmentBackend",
                       "ARCA_BACKEND_VERBOSITY": 2,
                       "ARCA_BACKEND_APK_DEPENDENCIES": ["libffi-dev"],
                       "ARCA_BACKEND_KEEP_CONTAINER_RUNNING": True,
-                      "ARCA_BACKEND_PUSH_TO_REGISTRY_NAME": "docker.io/mikicz/naucse",
+                      # https://docs.travis-ci.com/user/pull-requests/#Pull-Requests-and-Security-Restrictions
+                      # "ARCA_BACKEND_PUSH_TO_REGISTRY_NAME": "docker.io/mikicz/naucse",
                       "ARCA_SINGLE_PULL": True,
                       "ARCA_CACHE_BACKEND": "dogpile.cache.dbm",
                       "ARCA_CACHE_BACKEND_ARGUMENTS": {
