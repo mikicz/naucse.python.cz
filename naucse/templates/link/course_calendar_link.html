@@ -5,10 +5,10 @@
 {% endblock extra_links%}
 
 {% block breadcrumbs %}
-> <a href="{{ course_url(course) }}">{{ course.title }}</a>
+> <a href="{{ course.url }}">{{ course.title }}</a>
 > Kalendář
 {% endblock %}
 
 {% block course_content %}
-  {% include "content/course_calendar.html" %}
+  {{ content|safe }}
 {% endblock %}

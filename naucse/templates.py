@@ -46,10 +46,10 @@ def dedent(text):
 
 @template_filter()
 def edit_link(path):
+    from naucse.routes import model
     if path == Path("."):
-        return "https://github.com/pyvec/naucse.python.cz"
-    github_base = "https://github.com/pyvec/naucse.python.cz/blob/master/"
-    return github_base + str(path)
+        return f"https://github.com/{model.meta.slug}"
+    return f"https://github.com/{model.meta.slug}/blob/{model.meta.branch}/{str(path)}"
 
 
 @template_filter()
@@ -196,6 +196,7 @@ def format_date_range(start_and_end):
         parts += [' – ']
     parts += [format_date(end)]
     return ''.join(parts).format(start=start, end=end)
+
 
 @template_filter()
 def monthname(number):

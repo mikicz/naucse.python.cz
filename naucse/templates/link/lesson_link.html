@@ -11,21 +11,17 @@
 {% endblock %}
 
 {% block breadcrumbs %}
-> <a href="{{ course_url(course) }}">{{ course.title }}</a>
+> <a href="{{ course.url }}">{{ course.title }}</a>
 {% if session %}
-> <a href="{{ session_url(course.slug, session.slug) }}">{{ session.title }}</a>
+> <a href="{{ session.url }}">{{ session.title }}</a>
 {% endif %}
 > {{ page.title }}
 {% endblock %}
 
-{% block warning_msg %}
-  {% if error_in_fork|default(false) %}
-    {% include "_using_default_page.html" %}
-  {% endif %}
-{% endblock %}
-
 {% block course_content %}
-
-  {{ content }}
+  {% if solution_number|default(None) is not none %}
+    <h1>{{ page.title }} – Řešení [{{ solution_number }}]</h1>
+  {% endif %}
+  {{ content|safe }}
 
 {% endblock %}

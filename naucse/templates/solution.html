@@ -1,12 +1,6 @@
 {% extends "lesson.html" %}
 
-{% block style %}
-    {% if page.css %}
-        {{ page.css }}
-    {% endif %}
-{% endblock style %}
-
-{% block lesson_content %}
-<h1>{{ page.title }} – Řešení [{{ solution_number }}]</h1>
-{{ super() }}
-{% endblock lesson_content %}
+{% block course_content %}
+  <h1>{{ page.title }} – Řešení [{{ solution_number }}]</h1>
+  {{ content }}
+{% endblock %}
