@@ -19,8 +19,8 @@ plan:
   - lesson: beginners/install
   - lesson: beginners/first-steps
   - lesson: beginners/install-editor
-  - lesson: git/install
   - lesson: custom/new-lesson
+  - lesson: git/install
   - title: Tahák na klávesnici (PDF)
     url: https://pyvec.github.io/cheatsheets/keyboard/keyboard-cs.pdf
     type: cheatsheet
