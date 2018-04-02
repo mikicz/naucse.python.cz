@@ -111,6 +111,10 @@ class DisallowedElement(Exception):
     pass
 
 
+class InvalidHTML(DisallowedElement):
+    pass
+
+
 class DisallowedStyle(Exception):
 
     _BASE = "Style element or page css are only allowed when they modify .dataframe elements."
@@ -160,6 +164,9 @@ class AllowedElementsParser(HTMLParser):
             # A special check is applied in :meth:`handle_data` method (only ``.dataframe`` styles allowed)
             'style',
         }
+
+    def error(self, message):
+        raise InvalidHTML(message)
 
     def handle_starttag(self, tag, attrs):
         if tag not in self.allowed_elements:
