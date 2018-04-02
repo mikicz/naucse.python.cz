@@ -27,7 +27,6 @@ deploy:
 branches:
   only:
   - rendering_from_modified
-  - arca_implementation
 env:
   global:
   - secure: cYYbe6i4CUP/X8V0NOT3bO5E+mq8K5IsJPtbrByibGWKu+PPCdeHwtHjcH+w+emp2UYBNeiT5pAJ+3fsN3LCF0W0t7b/4/L4iZvJtVvUa//BgW0Pa25xPnZbwPQ3LWOdsdw0odQLsaj2rs1k5GuLEOse07Ts6n1WReHapsrYr9TXiaRLPGilDtwjUOocxVRqpx15AMOoCLH2D+4A/HwM7E0kV/6fk/+dIQVbq2i/hJ8Z3ZLj488QcN3iiZPVX1gNYiyYuFrpXbVEyQhNAxwUSim6/wZUSf45fitishbH2Ii1JFGptp/qFWn0ewbFfAOaQ7LwqQ/jVElgg3Of19VLEWAJsTk7GZIbCX61xW0oO9qYzP7AEeR/m+GBkDYRGu9Z5ReenpsxxlYFQZkHSN1jA3KKVLOqSSFmzFgYnj/F4BW0oKR8dVpk79Q4BTFAOBZcXmpHDVl4d7NmWXhraB+ispog3pK40we80MPFTfMuA+oWXDQyslCUJbzcl4EtyaY+vYkbg3vVFBl3OHsQC0BujyUpM4RI/7wTMR9OPcNyg1zuyM/cVhw21AvebFyQMt2qwSOIlhRW11faeZIVeAAqAGnrcVdiYKaVw5GmnCrrMN8anzlOaZege/rFwkg/dB/+NfhEtY7mZKHmfSl8kC5duaz6aNdAa5l8c39s4OPmE0c=

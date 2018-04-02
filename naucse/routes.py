@@ -22,7 +22,7 @@ from naucse.utils import links
 from naucse.utils.models import arca
 from naucse.utils.routes import (get_recent_runs, list_months, DisallowedStyle,
                                  DisallowedElement, does_course_return_info, absolute_urls_to_freeze,
-                                 raise_errors_from_forks, page_content_cache_key)
+                                 raise_errors_from_forks, page_content_cache_key, InvalidHTML)
 
 app = Flask('naucse')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -31,7 +31,7 @@ logger.setLevel(logging.DEBUG)
 
 setup_jinja_env(app.jinja_env)
 POSSIBLE_FORK_EXCEPTIONS = (PullError, BuildError, DisallowedStyle, DisallowedElement, FileNotFoundError,
-                            RequirementsMismatch)
+                            RequirementsMismatch, InvalidHTML)
 
 _cached_model = None
 
