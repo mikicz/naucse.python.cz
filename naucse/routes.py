@@ -218,6 +218,8 @@ def course(course, content_only=False):
         try:
             data_from_fork = course.render_course(request_url=request.path)
         except POSSIBLE_FORK_EXCEPTIONS as e:
+            if raise_errors_from_forks():
+                raise
             # there's no way to replace this page, render an error page instead
             logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
             logger.exception(e)
@@ -603,6 +605,8 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
             prev_link, session_link, next_link = course.get_footer_links(lesson.slug, page, request_url=request.path)
             page = lesson.pages[page]
         except POSSIBLE_FORK_EXCEPTIONS as e:
+            if raise_errors_from_forks():
+                raise
             # the fork is failing spectacularly, the footer links aren't that important
             logger.error("Could not retrieve even footer links from the fork at page %s", request.path)
             logger.exception(e)
@@ -658,6 +662,8 @@ def session_coverpage(course, session, coverpage, content_only=False):
         try:
             data_from_fork = course.render_session_coverpage(session, coverpage, request_url=request.path)
         except POSSIBLE_FORK_EXCEPTIONS as e:
+            if raise_errors_from_forks():
+                raise
             # there's no way to replace this page, render an error page instead
             logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
             logger.exception(e)
@@ -734,6 +740,9 @@ def course_calendar(course, content_only=False):
         try:
             data_from_fork = course.render_calendar(request_url=request.path)
         except POSSIBLE_FORK_EXCEPTIONS as e:
+            if raise_errors_from_forks():
+                raise
+
             logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
             logger.exception(e)
             return render_template(
@@ -810,6 +819,9 @@ def course_calendar_ics(course):
         try:
             data_from_fork = course.render_calendar_ics(request_url=request.path)
         except POSSIBLE_FORK_EXCEPTIONS as e:
+            if raise_errors_from_forks():
+                raise
+
             logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
             logger.exception(e)
             return render_template(
