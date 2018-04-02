@@ -21,7 +21,7 @@ from naucse.urlconverters import register_url_converters
 from naucse.utils import links
 from naucse.utils.models import arca
 from naucse.utils.routes import (get_recent_runs, list_months, DisallowedStyle,
-                                 DisallowedElement, does_course_return_info, urls_from_forks,
+                                 DisallowedElement, does_course_return_info, absolute_urls_to_freeze,
                                  raise_errors_from_forks, page_content_cache_key)
 
 app = Flask('naucse')
@@ -94,6 +94,9 @@ def index():
 
 @app.route('/runs/')
 def runs():
+    # since even the basic info about the forked runs can be broken, we need to make sure the required info
+    # is provided. If ``RAISE_FORK_ERRORS`` is set, exceptions are raised here, otherwise the run is
+    # ignored completely.
     safe_years = {}
     for year, run_years in model.run_years.items():
         safe_run_years = []
@@ -115,6 +118,9 @@ def runs():
 
 @app.route('/courses/')
 def courses():
+    # since even the basic info about the forked courses can be broken, we need to make sure the required info
+    # is provided. If ``RAISE_FORK_ERRORS`` is set, exceptions are raised here, otherwise the course is
+    # ignored completely.
     safe_courses = []
 
     for course in model.courses.values():
@@ -152,10 +158,10 @@ def lesson_static(course, lesson, path):
         try:
             return send_from_directory(*course.lesson_static(lesson_slug, path))
         except (PullError, FileNotFoundError):
-            # if the file cannot be retrieved use canonical file instead
+            # if the file cannot be retrieved, try to use the canonical file instead
             pass
 
-    # only if the lesson is canonical
+    # continue only if the lesson is canonical
     if lesson is None:
         abort(404)
 
@@ -165,8 +171,8 @@ def lesson_static(course, lesson, path):
 
 
 def lesson_static_generator_dir(lesson_slug, static_dir, search_dir):
-    """ Generates all lesson_static calls from director ``search_dir`` (yield relative to ``static_dir`` for lesson with
-    slug ``lesson_slug``).
+    """ Generates all lesson_static calls from director ``search_dir``.
+        (yields path relative to ``static_dir`` for lesson with slug ``lesson_slug``)
     """
     if not search_dir.exists():
         return
@@ -208,13 +214,11 @@ def lesson_static_generator():
 
 @app.route('/<course:course>/')
 def course(course, content_only=False):
-    # if not content_only:
     if course.is_link():
         try:
-            # from naucse.utils import render
-            # data_from_fork = render("course", course.slug)
             data_from_fork = course.render_course(request_url=request.path)
         except POSSIBLE_FORK_EXCEPTIONS as e:
+            # there's no way to replace this page, render an error page instead
             logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
             logger.exception(e)
             return render_template(
@@ -227,6 +231,7 @@ def course(course, content_only=False):
             )
 
         try:
+            # get the edit information if came in the response
             edit_info = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
 
             return render_template(
@@ -245,11 +250,12 @@ def course(course, content_only=False):
 
         return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
 
+    # this function is used in the fork to generate the content, but only the actual content is needed
     if content_only:
         template_name = 'content/course.html'
-        recent_runs = None
+        recent_runs = None  # the variable isn't used in content
     else:
-        template_name = 'course.html'
+        template_name = 'course.html'  # includes 'content/course.html'
         recent_runs = get_recent_runs(course)
 
     try:
@@ -267,6 +273,8 @@ def course(course, content_only=False):
 
 
 def render_page(page, solution=None, vars=None, **kwargs):
+    """ Renders a specific lesson, its subpage or a solution.
+    """
     lesson = page.lesson
 
     course = kwargs.get("course", None)
@@ -281,6 +289,12 @@ def render_page(page, solution=None, vars=None, **kwargs):
 
     try:
         def content_creator():
+            """ Returns the content and all relative urls used in it.
+
+            Since the content is stored in cache and can be reused elsewhere, urls
+            must be stored as relative to the current page, so new absolute urls can be generated
+            where the content is reused.
+            """
             with temporary_url_for_logger(app) as logger:
                 with logger:
                     content = page.render_html(
@@ -305,21 +319,23 @@ def render_page(page, solution=None, vars=None, **kwargs):
             cached = content_creator()
             content = cached["content"]
         else:
-            # since ARCA_IGNORE_CACHE_ERRORS is set, this won't fail in forks even if the cache doesn't work
+            # since ARCA_IGNORE_CACHE_ERRORS is used, this won't fail in forks even if the cache doesn't work
             # this is only dangerous if the fork sets absolute path to cache and
             # CurrentEnvironmentBackend or VenvBackend are used locally
             # FIXME? But I don't think there's a way to prevent writing to a file in those backends
             cached = arca.region.get_or_create(content_key, content_creator)
 
+            # the urls are added twice to ``absolute_urls_to_freeze`` when the content is created
+            # but it doesn't matter, duplicate urls are skipped
             absolute_urls = [get_absolute_url(request.path, x) for x in cached["urls"]]
-
-            urls_from_forks.extend(absolute_urls)
+            absolute_urls_to_freeze.extend(absolute_urls)
 
             content = cached["content"]
 
     except FileNotFoundError:
         abort(404)
 
+    # when used in fork, only the content and the urls are needed
     if content_only:
         return cached
 
@@ -335,6 +351,10 @@ def render_page(page, solution=None, vars=None, **kwargs):
     kwargs.setdefault('title', page.title)
     kwargs.setdefault('content', content)
     kwargs.setdefault('root_slug', model.meta.slug)
+
+    # when rendering canonical version instead of a failing fork content is used,
+    # a widget is added to the page with a warning and a link to Travis,
+    # and if TRAVIS_BUILD_ID is set, we can link to the current build
     kwargs.setdefault('travis_build_id', os.environ.get("TRAVIS_BUILD_ID"))
 
     return render_template(template_name, **kwargs, **vars_functions(vars),
@@ -394,6 +414,8 @@ def get_footer_links(course, session, prv, nxt, lesson_url):
 
 
 def get_relative_url(current, target):
+    """ Returns an url to ``target`` relative to ``current``.
+    """
     rel = os.path.relpath(target, current)
 
     if rel[-1] != "/":
@@ -407,11 +429,13 @@ def get_relative_url(current, target):
 
 
 def get_absolute_url(current, target):
+    """ Get's an absolute url from the relative ``target`` in relation to ``current``.
+    """
     return urllib.parse.urljoin(current, target)
 
 
 def relative_url_functions(current_url, course, lesson):
-    """ Builds relative urls generators based on current page
+    """ Returns relative urls generators based on current page.
     """
     def lesson_url(lesson, *args, **kwargs):
         if not isinstance(lesson, str):
@@ -477,10 +501,10 @@ def course_link_page(course, lesson_slug, page, solution):
 
         if content is None:
             content = content_offer["content"]
-            urls_from_forks.extend([get_absolute_url(request.path, x) for x in content_offer["urls"]])
+            absolute_urls_to_freeze.extend([get_absolute_url(request.path, x) for x in content_offer["urls"]])
         else:
             arca.region.set(content_key, {"content": content, "urls": data_from_fork["content_urls"]})
-            urls_from_forks.extend([get_absolute_url(request.path, x) for x in data_from_fork["content_urls"]])
+            absolute_urls_to_freeze.extend([get_absolute_url(request.path, x) for x in data_from_fork["content_urls"]])
 
         # get PageLink here since css parsing is in it so the exception can be caught here
         page = links.PageLink(data_from_fork.get("page", {}))
@@ -555,9 +579,9 @@ def course_link_page(course, lesson_slug, page, solution):
 def course_page(course, lesson, page, solution=None, content_only=False, **kwargs):
     """ Render the html of the given lesson page in the course.
 
-        The lesson url convertor can't be used since there can be new lessons in the forked repositories,
-        however if the course isn't a lik to a fork and the lesson doesn't exist in the current repository,
-        the function returns a 404
+    The lesson url convertor can't be used since there can be new lessons in the forked repositories,
+    however if the course isn't a lik to a fork and the lesson doesn't exist in the current repository,
+    the function returns a 404
     """
     error_in_fork = kwargs.get("error_in_fork", False)
 
@@ -574,11 +598,12 @@ def course_page(course, lesson, page, solution=None, content_only=False, **kwarg
     if not error_in_fork:
         page, session, prv, nxt = get_page(course, lesson, page)
         prev_link, session_link, next_link = get_footer_links(course, session, prv, nxt, lesson_url)
-    else:
+    else:  # rendering canonical version instead of a failing forked page
         try:
             prev_link, session_link, next_link = course.get_footer_links(lesson.slug, page, request_url=request.path)
             page = lesson.pages[page]
         except POSSIBLE_FORK_EXCEPTIONS as e:
+            # the fork is failing spectacularly, the footer links aren't that important
             logger.error("Could not retrieve even footer links from the fork at page %s", request.path)
             logger.exception(e)
             prev_link = session_link = next_link = None
@@ -633,6 +658,7 @@ def session_coverpage(course, session, coverpage, content_only=False):
         try:
             data_from_fork = course.render_session_coverpage(session, coverpage, request_url=request.path)
         except POSSIBLE_FORK_EXCEPTIONS as e:
+            # there's no way to replace this page, render an error page instead
             logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
             logger.exception(e)
             return render_template(
@@ -644,9 +670,6 @@ def session_coverpage(course, session, coverpage, content_only=False):
                 root_slug=model.meta.slug,
                 travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
-
-        # from naucse.utils import render
-        # data_from_fork = render("session_coverpage", course.slug, session, coverpage)
 
         try:
             course = links.CourseLink(data_from_fork.get("course", {}))
@@ -673,17 +696,14 @@ def session_coverpage(course, session, coverpage, content_only=False):
 
         return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
 
-    def session_url(session):
-        return url_for("session_coverpage",
-                       course=course,
-                       session=session,
-                       coverpage=coverpage)
-
     content = session.get_coverpage_content(course, coverpage, app)
 
-    template = "coverpage.html" if not content_only else "content/coverpage.html"
-    if coverpage == "back":
-        template = "backpage.html" if not content_only else "content/backpage.html"
+    if content_only:
+        # when used in fork, only the actual content is needed
+        template = "content/coverpage.html" if coverpage != "back" else "content/backpage.html"
+    else:
+        # includes the ``content/coverpage.html`` or ``content/backpage.html``
+        template = "coverpage.html" if coverpage != "back" else "backpage.html"
 
     homework_section = False
     link_section = False
@@ -741,8 +761,15 @@ def course_calendar(course, content_only=False):
     if not course.start_date:
         abort(404)
 
+    if content_only:
+        # when in fork, only the actual calendar is needed
+        template = 'content/course_calendar.html'
+    else:
+        # includes ``content/course_calendar.html``
+        template = 'course_calendar.html'
+
     sessions_by_date = {s.date: s for s in course.sessions.values()}
-    return render_template('course_calendar.html' if not content_only else 'content/course_calendar.html',
+    return render_template(template,
                            edit_path=course.edit_path,
                            course=course,
                            sessions_by_date=sessions_by_date,

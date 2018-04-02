@@ -1,9 +1,5 @@
-# encoding=utf-8
-from __future__ import unicode_literals, print_function
-
 import click
 import elsa
-from colorama import Fore, Style
 
 from naucse.utils.routes import does_course_return_info
 
@@ -13,11 +9,6 @@ def cli(app, *, base_url=None, freezer=None):
         which are present with basic info about them.
     """
     elsa_group = elsa.cli(app, base_url=base_url, freezer=freezer, invoke_cli=False)
-
-    reset = f"{Style.RESET_ALL}"
-    blue = f"{Fore.BLUE}{Style.BRIGHT}"
-    green = f"{Fore.GREEN}{Style.BRIGHT}"
-    red = f"{Fore.RED}{Style.BRIGHT}"
 
     @click.group()
     def naucse():
@@ -39,16 +30,16 @@ def cli(app, *, base_url=None, freezer=None):
         from naucse.routes import model
 
         def canonical(course, x=""):
-            click.echo(f"{green}{course.slug}: {course.title}{x}{reset}")
+            click.echo(f"  {course.slug}: {course.title}{x}")
 
         def fork_invalid(course):
-            click.echo(f"{red}{course.slug}, from {course.repo}@{course.branch}: "
-                       f"Fork doesn't return basic info, will be ignored.{reset}")
+            click.echo(f"  {course.slug}, from {course.repo}@{course.branch}: "
+                       f"Fork doesn't return basic info, will be ignored.")
 
         def fork_valid(course, x=""):
-            click.echo(f"{green}{course.slug}, from {course.repo}@{course.branch}: {course.title}{x}{reset}")
+            click.echo(f"  {course.slug}, from {course.repo}@{course.branch}: {course.title}{x}")
 
-        click.echo(f"{blue}Courses:{reset}")
+        click.echo(f"Courses:")
 
         for course in model.courses.values():
             if forks_only and not course.is_link():
@@ -62,7 +53,7 @@ def cli(app, *, base_url=None, freezer=None):
                 else:
                     fork_invalid(course)
 
-        click.echo(f"{blue}Runs:{reset}")
+        click.echo(f"Runs:")
 
         for course in model.runs.values():
             if forks_only and not course.is_link():

@@ -17,5 +17,3 @@ git+https://github.com/mikicz/arca.git#egg=arca
 cssutils
 gitpython
 click
-colorama
-
