@@ -11,7 +11,7 @@ from flask.testing import FlaskClient
 from git import Repo
 
 from naucse import models
-from naucse.routes import page_content_cache_key
+from naucse.utils.routes import page_content_cache_key
 from naucse.utils.models import arca
 
 
@@ -63,9 +63,9 @@ def fork():
 
     1) Copies the entire local state of naucse
     2) Adds one working course and one working run
-    3) Commits everything at branch ``test_branch``
+    3) Commits everything on branch ``test_branch``
     4) Adds one more course and one more run, but breaks all rendering
-    5) Commits the broken state at ``test_broken_branch``
+    5) Commits the broken state on ``test_broken_branch``
     6) Deletes the fork once pytest finishes using this fixture
     """
 
@@ -201,7 +201,7 @@ def test_run_info(model):
 
 def test_course_render(model):
     """ This tests that course pages are rendered correctly (course, sessions, lessons)
-    Also tests that run pages (calendar) aren't rendered.
+    Also tests that run pages (calendar) aren't rendered for courses.
     """
     assert model.courses["test-course"].render_course()
     with pytest.raises(BuildError):
@@ -273,7 +273,7 @@ def test_cache_offer(model):
 
     assert result["content"] is None
 
-    # also test that if a key is provided, but a key that's gonna be rejected
+    # also test that if provided a key which is gonna be rejected, content is  rendered
 
     result = model.courses["test-course"].render_page("beginners/cmdline", "index", None,
                                                       content_key=content_key + "asdfasdf",
@@ -348,3 +348,58 @@ def test_failing_pages(url, client: FlaskClient):
     """
     response = client.get(url)
     assert b"alert alert-danger" in response.data
+
+
+def test_get_footer_links(model):
+    course = model.courses["test-course"]
+
+    # test first lesson of first session
+    prev_link, session_link, next_link = course.get_footer_links("beginners/cmdline", "index")
+
+    assert prev_link is None
+
+    assert isinstance(session_link, dict)
+    assert session_link["title"] == "First session"
+    assert session_link["url"] == "/course/test-course/sessions/first-session/"
+
+    assert isinstance(next_link, dict)
+    assert len(next_link["title"])  # titles are dependant on lessons content, lets just check they're there
+    assert next_link["url"] == "/course/test-course/beginners/install/"
+
+    # test last lesson of a session
+    prev_link, session_link, next_link = course.get_footer_links("beginners/install", "index")
+
+    assert isinstance(prev_link, dict)
+    assert len(prev_link["title"])  # titles are dependant on lessons content, lets just check they're there
+    assert prev_link["url"] == "/course/test-course/beginners/cmdline/"
+
+    assert isinstance(session_link, dict)
+    assert session_link["title"] == "First session"
+    assert session_link["url"] == "/course/test-course/sessions/first-session/"
+
+    assert isinstance(next_link, dict)
+    assert next_link["title"] == "Závěr lekce"
+    assert next_link["url"] == "/course/test-course/sessions/first-session/back/"
+
+    # test first lesson of a session with a previous session
+    prev_link, session_link, next_link = course.get_footer_links("beginners/first-steps", "index")
+
+    assert prev_link is None
+
+    assert isinstance(session_link, dict)
+    assert session_link["title"] == "Second session"
+    assert session_link["url"] == "/course/test-course/sessions/second-session/"
+
+    assert isinstance(next_link, dict)
+    assert len(next_link["title"])  # titles are dependant on lessons content, lets just check they're there
+    assert next_link["url"] == "/course/test-course/beginners/install-editor/"
+
+    # test nonsense lesson
+
+    with pytest.raises(BuildError):
+        course.get_footer_links("custom/non-existing", "index")
+
+    # test nonsense page
+
+    with pytest.raises(BuildError):
+        course.get_footer_links("beginners/cmdline", "some-subpage")

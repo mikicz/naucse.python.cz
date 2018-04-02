@@ -1,3 +1,5 @@
+""" These classes serve as compatibility utils for info from forks, so changes to templates aren't required.
+"""
 from xml.dom import SyntaxErr
 
 from naucse.models import Page

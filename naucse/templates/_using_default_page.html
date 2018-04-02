@@ -7,7 +7,8 @@
     Níže jsou informace o repozitáři ze kterého měl být obsah vykreslen. Jestli chceš pomoci, můžeš například
     napsat správci daného repozitáře nebo v něm vytvořit ticket.
     Všechny podrobnosti proč se nepovedlo stránku vykreslit by měly být na
-    <a href="https://travis-ci.org/{{ root_slug }}" target="_blank">Travisu</a>.
+    <a href="https://travis-ci.org/{{ root_slug }}{% if travis_build_id|default(none) is not none %}/builds/{{ travis_build_id }}{% endif %}"
+       target="_blank">Travisu</a>.
   </p>
 
   <h3>Informace o forku:</h3>
