@@ -1,28 +1,28 @@
-from collections import OrderedDict
-
 import datetime
-
-import pytest
 import shutil
 import tempfile
+from collections import OrderedDict
 from pathlib import Path
 
+import pytest
 import yaml
 from arca.exceptions import BuildError
 from flask.testing import FlaskClient
 from git import Repo
 
 from naucse import models
+from naucse.utils.routes import page_content_cache_key
+from naucse.utils.models import arca
 
 
-def generate_course(title):
+def generate_info(title, course_type, coach_present, some_var):
     return {
         "title": title,
-        "description": "Course description",
-        "long_description": "Course long description",
+        "description": f"{course_type} description",
+        "long_description": f"{course_type} long description",
         "vars": {
-            "coach-present": False,
-            "some-var": True
+            "coach-present": coach_present,
+            "some-var": some_var
         },
         "plan": [
             {"title": "First session",
@@ -41,40 +41,35 @@ def generate_course(title):
     }
 
 
+def generate_course(title):
+    return generate_info(title, "Course", False, True)
+
+
 def generate_run(title):
-    return {
-        "title": title,
-        "description": "Run description",
-        "long_description": "Run long description",
-        "default_time": {
-            "start": "18:00",
-            "end": "20:00"
-        },
-        "vars": {
-            "coach-present": True,
-            "some-var": False
-        },
-        "plan": [
-            {"title": "First session",
-             "slug": "first-session",
-             "date": datetime.date(2018, 2, 6),
-             "materials": [
-                 {"lesson": "beginners/cmdline"},
-                 {"lesson": "beginners/install"}
-             ]},
-            {"title": "Second session",
-             "slug": "second-session",
-             "date": datetime.date(2018, 2, 8),
-             "materials": [
-                 {"lesson": "beginners/first-steps"},
-                 {"lesson": "beginners/install-editor"}
-             ]},
-        ]
+    run = generate_info(title, "Run", True, False)
+    run["default_time"] = {
+        "start": "18:00",
+        "end": "20:00"
     }
+    run["plan"][0]["date"] = datetime.date(2018, 2, 6)
+    run["plan"][1]["date"] = datetime.date(2018, 2, 8)
+
+    return run
 
 
 @pytest.fixture(scope="module")
 def fork():
+    """ This fixture generates a local fork of the current state of naucse for testing.
+
+    1) Copies the entire local state of naucse
+    2) Adds one working course and one working run
+    3) Commits everything on branch ``test_branch``
+    4) Adds one more course and one more run, but breaks all rendering
+    5) Commits the broken state on ``test_broken_branch``
+    6) Deletes the fork once pytest finishes using this fixture
+    """
+
+    # create a fork on a branch ``test_branch``
     def ignore(_, names):
         return [x for x in names
                 if ((x.startswith(".") and x not in {".git", ".gitignore", ".travis.yml"}) or
@@ -90,18 +85,22 @@ def fork():
     repo.create_head(branch)
     getattr(repo.heads, branch).checkout()
 
+    # one working course
     course_info = test_dir / "courses/test-course/info.yml"
     course_info.parent.mkdir(exist_ok=True, parents=True)
     course_info.write_text(yaml.dump(generate_course("Course title"), default_flow_style=False))
 
+    # one working run
     run_info = test_dir / "runs/2018/test-run/info.yml"
     run_info.parent.mkdir(exist_ok=True, parents=True)
     run_info.write_text(yaml.dump(generate_run("Run title"), default_flow_style=False))
 
+    # commit everything
     repo.git.add([str(course_info), str(run_info)])
     repo.git.add(A=True)
     repo.index.commit("Commited everything")
 
+    # a broken branch for error handling testing
     branch = "test_broken_branch"
     repo.create_head(branch)
     getattr(repo.heads, branch).checkout()
@@ -115,18 +114,20 @@ def fork():
     run_broken_info.write_text(yaml.dump(generate_run("Broken run title"), default_flow_style=False))
 
     utils = test_dir / "naucse/utils" / "forks.py"
-    with utils.open("w") as fl:
-        fl.write("")
+    utils.write_text("")
 
     repo.git.add([str(course_broken_info), str(run_broken_info), str(utils)])
     repo.index.commit("Created duplicates in a different branch, but broke rendering")
 
     yield f"file://{test_dir}"
+
     shutil.rmtree(test_dir.parent)
 
 
 @pytest.fixture(scope="module")
 def model(fork):
+    """ This fixture generates a Root instance, with the courses and runs generated in fixture ``fork``
+    """
     path = Path(__file__).parent / 'fixtures/test_content'
     root = models.Root(path)
 
@@ -146,6 +147,8 @@ def model(fork):
     run_broken.repo = fork
     run_broken.branch = "test_broken_branch"
 
+    # so no file operations are needed, override list of courses and runs as well
+
     root.courses = OrderedDict([("test-course", course), ('test-broken-course', course_broken)])
 
     run_year = models.RunYear(root, path / 'runs/2018')
@@ -164,6 +167,8 @@ def model(fork):
 
 @pytest.fixture
 def client(model, mocker):
+    """ This fixture generates a client for testing endpoints, model will be used.
+    """
     mocker.patch("naucse.routes._cached_model", model)
     from naucse import app
     app.testing = True
@@ -171,6 +176,8 @@ def client(model, mocker):
 
 
 def test_course_info(model):
+    """ This tests that all course meta data are generated properly from the fork info
+    """
     assert model.courses["test-course"].title == "Course title"
     assert model.courses["test-course"].description == "Course description"
     assert model.courses["test-course"].start_date is None
@@ -181,6 +188,8 @@ def test_course_info(model):
 
 
 def test_run_info(model):
+    """ This tests that all run meta data are generated properly from the fork info
+    """
     assert model.runs[(2018, "test-run")].title == "Run title"
     assert model.runs[(2018, "test-run")].description == "Run description"
     assert model.runs[(2018, "test-run")].start_date == datetime.date(2018, 2, 6)
@@ -190,7 +199,10 @@ def test_run_info(model):
     assert model.runs[(2018, "test-run")].vars.get("some-var") is False
 
 
-def test_course_render(model, client: FlaskClient):
+def test_course_render(model):
+    """ This tests that course pages are rendered correctly (course, sessions, lessons)
+    Also tests that run pages (calendar) aren't rendered for courses.
+    """
     assert model.courses["test-course"].render_course()
     with pytest.raises(BuildError):
         model.courses["test-course"].render_calendar()
@@ -219,7 +231,9 @@ def test_course_render(model, client: FlaskClient):
     assert index != linux
 
 
-def test_run_render(model, client: FlaskClient):
+def test_run_render(model):
+    """ This tests that run pages are rendered correctly (course, calendars, sessions, lessons)
+    """
     assert model.runs[(2018, "test-run")].render_course()
 
     assert model.runs[(2018, "test-run")].render_calendar()
@@ -246,15 +260,39 @@ def test_run_render(model, client: FlaskClient):
     assert index != solution
 
 
+def test_cache_offer(model):
+    """ Tests that forks don't render content when content exists in cache.
+    """
+    repo = arca.get_repo(model.courses["test-course"].repo, model.courses["test-course"].branch)
+
+    content_key = page_content_cache_key(repo, "beginners/cmdline", "index", None, model.courses["test-course"].vars)
+
+    result = model.courses["test-course"].render_page("beginners/cmdline", "index", None,
+                                                      content_key=content_key,
+                                                      request_url="/course/test-course/beginners/cmdline/")
+
+    assert result["content"] is None
+
+    # also test that if provided a key which is gonna be rejected, content is  rendered
+
+    result = model.courses["test-course"].render_page("beginners/cmdline", "index", None,
+                                                      content_key=content_key + "asdfasdf",
+                                                      request_url="/course/test-course/beginners/cmdline/")
+
+    assert result["content"] is not None
+
+
 def test_courses_page(mocker, client: FlaskClient):
-    mocker.patch("naucse.utils.routes.should_raise_basic_course_problems", lambda: True)
+    """ Tests how the /courses/ page behaves when a fork isn't returning information about a course.
+    """
+    mocker.patch("naucse.utils.routes.raise_errors_from_forks", lambda: True)
 
     # there's a problem in one of the branches, it should raise error if the conditions for raising are True
     with pytest.raises(BuildError):
         client.get("/courses/")
 
     # unless problems are silenced
-    mocker.patch("naucse.utils.routes.should_raise_basic_course_problems", lambda: False)
+    mocker.patch("naucse.utils.routes.raise_errors_from_forks", lambda: False)
     response = client.get("/courses/")
     assert b"Broken course title" not in response.data
 
@@ -263,19 +301,37 @@ def test_courses_page(mocker, client: FlaskClient):
 
 
 def test_runs_page(mocker, client: FlaskClient):
-    mocker.patch("naucse.utils.routes.should_raise_basic_course_problems", lambda: True)
+    """ Tests how the /runs/ page behaves when a fork isn't returning information about a course.
+    """
+    mocker.patch("naucse.utils.routes.raise_errors_from_forks", lambda: True)
 
     # there's a problem in one of the branches, it should raise error if the conditions for raising are True
     with pytest.raises(BuildError):
         client.get("/runs/")
 
     # unless problems are silenced
-    mocker.patch("naucse.utils.routes.should_raise_basic_course_problems", lambda: False)
+    mocker.patch("naucse.utils.routes.raise_errors_from_forks", lambda: False)
     response = client.get("/runs/")
     assert b"Broken run title" not in response.data
 
     # but working forks are still present
     assert b"Run title" in response.data
+
+
+@pytest.mark.parametrize("url", [
+    "/course/test-course/",
+    "/course/test-course/sessions/first-session/",
+    "/course/test-course/beginners/cmdline/",
+    "/course/test-course/beginners/cmdline/index/solutions/0/",
+    "/course/test-course/beginners/install/linux/",
+    "/2018/test-run/",
+    "/2018/test-run/calendar/",
+])
+def test_working_pages(url, client: FlaskClient):
+    """ Tests that the rendering of the pages is actually working and not returning a warning.
+    """
+    response = client.get(url)
+    assert b"alert alert-danger" not in response.data
 
 
 @pytest.mark.parametrize("url", [
@@ -287,8 +343,63 @@ def test_runs_page(mocker, client: FlaskClient):
     "/2018/test-broken-run/",
     "/2018/test-broken-run/calendar/",
 ])
-def test_pages(url, client: FlaskClient):
-    """ Rendering of the page shouldn't fail, it should return a page win an error message
+def test_failing_pages(url, client: FlaskClient):
+    """ Rendering of the pages shouldn't fail, it should return a page win an error message.
     """
     response = client.get(url)
     assert b"alert alert-danger" in response.data
+
+
+def test_get_footer_links(model):
+    course = model.courses["test-course"]
+
+    # test first lesson of first session
+    prev_link, session_link, next_link = course.get_footer_links("beginners/cmdline", "index")
+
+    assert prev_link is None
+
+    assert isinstance(session_link, dict)
+    assert session_link["title"] == "First session"
+    assert session_link["url"] == "/course/test-course/sessions/first-session/"
+
+    assert isinstance(next_link, dict)
+    assert len(next_link["title"])  # titles are dependant on lessons content, lets just check they're there
+    assert next_link["url"] == "/course/test-course/beginners/install/"
+
+    # test last lesson of a session
+    prev_link, session_link, next_link = course.get_footer_links("beginners/install", "index")
+
+    assert isinstance(prev_link, dict)
+    assert len(prev_link["title"])  # titles are dependant on lessons content, lets just check they're there
+    assert prev_link["url"] == "/course/test-course/beginners/cmdline/"
+
+    assert isinstance(session_link, dict)
+    assert session_link["title"] == "First session"
+    assert session_link["url"] == "/course/test-course/sessions/first-session/"
+
+    assert isinstance(next_link, dict)
+    assert next_link["title"] == "Závěr lekce"
+    assert next_link["url"] == "/course/test-course/sessions/first-session/back/"
+
+    # test first lesson of a session with a previous session
+    prev_link, session_link, next_link = course.get_footer_links("beginners/first-steps", "index")
+
+    assert prev_link is None
+
+    assert isinstance(session_link, dict)
+    assert session_link["title"] == "Second session"
+    assert session_link["url"] == "/course/test-course/sessions/second-session/"
+
+    assert isinstance(next_link, dict)
+    assert len(next_link["title"])  # titles are dependant on lessons content, lets just check they're there
+    assert next_link["url"] == "/course/test-course/beginners/install-editor/"
+
+    # test nonsense lesson
+
+    with pytest.raises(BuildError):
+        course.get_footer_links("custom/non-existing", "index")
+
+    # test nonsense page
+
+    with pytest.raises(BuildError):
+        course.get_footer_links("beginners/cmdline", "some-subpage")

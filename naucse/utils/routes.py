@@ -1,16 +1,17 @@
 import datetime
+import hashlib
+import json
 import os
-from collections import deque
+from collections import deque, defaultdict
 from html.parser import HTMLParser
+from pathlib import Path
 from xml.dom import SyntaxErr
 
 import cssutils
-from arca.exceptions import PullError, BuildError
-from git import Repo
+from arca.exceptions import PullError, BuildError, RequirementsMismatch
 from arca.utils import get_last_commit_modifying_files
 
-
-urls_from_forks = deque()
+absolute_urls_to_freeze = deque()
 
 
 def get_recent_runs(course):
@@ -58,56 +59,86 @@ def list_months(start_date, end_date):
     return months
 
 
-_last_commit = {}
+_last_commit_naucse = {}
 
 
-def last_commit_modifying_lessons(repo=None):
-    """ Returns the hash of the commit which last modified either lesson contents or rendering mechanisms of naucse
-    in specified ``repo``.
+def last_commit_modifying_naucse(repo):
+    """ Returns the hash of the commit which last modified rendering mechanisms of naucse in specified ``repo``.
     """
     from naucse.routes import app
-    global _last_commit
-    if repo is None:
-        repo = Repo(".")
+    global _last_commit_naucse
 
-    if _last_commit.get(repo.git_dir):
-        return _last_commit[repo.git_dir]
+    if _last_commit_naucse.get(repo.git_dir):
+        return _last_commit_naucse[repo.git_dir]
 
-    # the arca utils is equivalent to calling:
-    # git log -n 1 --format=%H lessons/ naucse/
+    # the arca util is equivalent to calling:
+    # git log -n 1 --format=%H naucse/
 
-    # in theory the specific lesson from lessons could be requested, but the file has to exist
-    # and querying in base repo for last commit modifying a lesson in fork which might not even exist
-    # could fail - lessons/ is "good enough"
-
-    last_commit = get_last_commit_modifying_files(repo, "lessons/", "naucse/")
+    last_commit = get_last_commit_modifying_files(repo, "naucse/")
 
     if not app.config['DEBUG']:
-        _last_commit[repo.git_dir] = last_commit
+        _last_commit_naucse[repo.git_dir] = last_commit
 
     return last_commit
+
+
+_last_commit_lessons = defaultdict(dict)
+
+
+def last_commit_modifying_lesson(repo, lesson_slug):
+    """ Returns the hash of the commit which last modified specific lesson in specified ``repo``.
+    """
+    from naucse.routes import app
+
+    global _last_commit_lessons
+
+    if lesson_slug in _last_commit_lessons[repo.git_dir]:
+        return _last_commit_lessons[repo.git_dir][lesson_slug]
+
+    # ``repo.git_dir`` is path to the ``.git`` folder
+    if not (Path(repo.git_dir).parent / "lessons" / lesson_slug).exists():
+        raise FileNotFoundError
+
+    commit = get_last_commit_modifying_files(repo, "lessons/" + lesson_slug)
+
+    if not app.config['DEBUG']:
+        _last_commit_lessons[repo.git_dir][lesson_slug] = commit
+
+    return commit
 
 
 class DisallowedElement(Exception):
     pass
 
 
+class InvalidHTML(DisallowedElement):
+    pass
+
+
 class DisallowedStyle(Exception):
 
-    COULD_NOT_PARSE = "Style element or page css are only allowed when they modify either the .dataframe" \
-                      " elements or things inside .lesson-content, could not parse styles and verify."
-
-    OUT_OF_SCOPE = "Style element or page css are only allowed when they modify either the " \
-                   ".dataframe elements or things inside .lesson-content. " \
-                   "Rendered page contains a style or page css that modifies something else."
+    _BASE = "Style element or page css are only allowed when they modify .dataframe elements."
+    COULD_NOT_PARSE = _BASE + " Ccould not parse the styles and verify."
+    OUT_OF_SCOPE = _BASE + " Rendered page contains a style that modifies something else."
 
 
 class AllowedElementsParser(HTMLParser):
+    """
+    This parser is used on all HTML returned from forked repositories.
+
+    It raises exceptions in two cases:
+
+    * :class:`DisallowedElement` - if a element not defined in :attr:`allowed_elements` is used
+    * :class:`DisallowedStyle` - if a <style> element contains unparsable css or if it modifies something
+      different than ``.dataframe`` elements.
+    """
 
     def __init__(self, **kwargs):
         super(AllowedElementsParser, self).__init__(**kwargs)
-        self.current_element = None
         self.css_parser = cssutils.CSSParser(raiseExceptions=True)
+
+        #: Set of allowed HTML elements
+        #: It has been compiled out of elements currently used in canonical lessons
         self.allowed_elements = {
             # functional:
             'a', 'abbr', 'audio', 'img', 'source',
@@ -118,34 +149,35 @@ class AllowedElementsParser(HTMLParser):
             # formatting:
             'br', 'div', 'hr', 'p', 'pre', 'span',
 
-            # lists
+            # lists:
             'dd', 'dl', 'dt', 'li', 'ul', 'ol',
 
-            # headers
+            # headers:
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
 
-            # tables
+            # tables:
             'table', 'tbody', 'td', 'th', 'thead', 'tr',
 
-            # icons
+            # icons:
             'svg', 'circle', 'path',
 
-            # A special check is applied in `handle_data` method (only `.dataframe` styles allowed)
+            # A special check is applied in :meth:`handle_data` method (only ``.dataframe`` styles allowed)
             'style',
         }
+
+    def error(self, message):
+        raise InvalidHTML(message)
 
     def handle_starttag(self, tag, attrs):
         if tag not in self.allowed_elements:
             raise DisallowedElement(f"Element {tag} is not allowed.")
-        self.current_element = tag
 
     def handle_startendtag(self, tag, attrs):
         if tag not in self.allowed_elements:
             raise DisallowedElement(f"Element {tag} is not allowed.")
-        self.current_element = tag
 
     def handle_data(self, data):
-        if self.current_element == "style":
+        if self.lasttag == "style":
             self.validate_css(data)
 
     def reset_and_feed(self, data):
@@ -153,12 +185,7 @@ class AllowedElementsParser(HTMLParser):
         self.feed(data)
 
     def allow_selector(self, selector: str):
-        if not selector.startswith(".lesson-content ") and not selector.startswith(".dataframe "):
-            return False
-
-        selector = selector.strip()
-
-        if selector.startswith("+") or selector.startswith("~"):
+        if not selector.startswith(".dataframe "):
             return False
 
         return True
@@ -178,27 +205,28 @@ class AllowedElementsParser(HTMLParser):
                 raise DisallowedStyle(DisallowedStyle.OUT_OF_SCOPE)
 
 
-def should_raise_basic_course_problems():
-    """ Returns if naucse should ignore errors with pulling or getting basic info about courses and runs.
-        Only ignores errors when the build is on Travis in a branch used for building production site.
+def raise_errors_from_forks():
+    """ Returns if errors from forks should be raised or handled in the default way.
+
+    Only raising when a RAISE_FORK_ERRORS environ variable is set to ``true``.
+
+    Default handling:
+
+    * Not even basic course info is returned -> Left out of the list of courses
+    * Error rendering a page
+        * Lesson - if the lesson is canonical, canonical version is rendered with a warning
+        * Everything else - templates/error_in_fork.html is rendered
     """
-    from naucse.routes import model
+    if os.environ.get("RAISE_FORK_ERRORS", "false") == "true":
+        return True
 
-    if os.environ.get("IGNORE_FORK_ERRORS", "false") == "true":
-        return False
-
-    if os.environ.get("TRAVIS", "false") == "true":
-        if os.environ.get("TRAVIS_PULL_REQUEST", "false") != "false":
-            return True
-        if os.environ.get("TRAVIS_BRANCH", "") != model.meta.branch:
-            return True
-        return False
-
-    return True
+    return False
 
 
-def does_course_return_info(course, extra_required=()):
-    """ Checks that the external course can be pulled and that it successfully returns basic info about the course.
+def does_course_return_info(course, extra_required=(), *, force_ignore=False):
+    """ Returns if the the external course can be pulled and that it returns basic info about the course.
+
+    Raises exception if :func:`raise_errors_from_forks` returns it should. (But not if ``force_ignore`` is set.)
     """
     from naucse.routes import logger
 
@@ -206,21 +234,44 @@ def does_course_return_info(course, extra_required=()):
     try:
         if isinstance(course.info, dict) and all([x in course.info for x in required]):
             return True
-        elif should_raise_basic_course_problems():
+
+        if raise_errors_from_forks() and not force_ignore:
             raise ValueError(f"Couldn't get basic info about the course {course.slug}, "
                              f"the repo didn't return a dict or the required info is missing.")
-        logger.error("There was an problem getting basic info out of forked course %s. "
-                     "Suppressing, because this is the production branch.", course.slug)
-    except PullError as e:
-        if should_raise_basic_course_problems():
+        else:
+            logger.error("There was an problem getting basic info out of forked course %s. "
+                         "Suppressing, because this is the production branch.", course.slug)
+    except (PullError, BuildError, RequirementsMismatch) as e:
+        if raise_errors_from_forks() and not force_ignore:
             raise
-        logger.error("There was an problem either pull the forked course %s. "
-                     "Suppressing, because this is the production branch.", course.slug)
+        if isinstance(e, PullError):
+            logger.error("There was an problem either pulling or cloning the forked course %s. "
+                         "Suppressing, because this is the production branch.", course.slug)
+        elif isinstance(e, RequirementsMismatch):
+            logger.error("There are some extra requirements in the forked course %s. "
+                         "Suppressing, because this is the production branch.", course.slug)
+        else:
+            logger.error("There was an problem getting basic info out of forked course %s. "
+                         "Suppressing, because this is the production branch.", course.slug)
         logger.exception(e)
-    except BuildError as e:
-        if should_raise_basic_course_problems():
-            raise
-        logger.error("There was an problem getting basic info out of forked course %s. "
-                     "Suppressing, because this is the production branch.", course.slug)
-        logger.exception(e)
+
     return False
+
+
+def page_content_cache_key(repo, lesson_slug, page, solution, course_vars=None) -> str:
+    """ Returns a key under which content fragments will be stored in cache, depending on the page
+        and the last commit which modified lesson rendering in ``repo``
+    """
+    return "commit:{}:content:{}".format(
+        last_commit_modifying_naucse(repo),
+        hashlib.sha1(json.dumps(
+            {
+                "lesson": lesson_slug,
+                "page": page,
+                "solution": solution,
+                "vars": course_vars,
+                "lesson_last_modified_by": last_commit_modifying_lesson(repo, lesson_slug),
+            },
+            sort_keys=True
+        ).encode("utf-8")).hexdigest()
+    )

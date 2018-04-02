@@ -1,6 +1,6 @@
 PyYAML
 ansi2html
-elsa>=0.1.3
+elsa>=0.1.4
 flask
 frozen-flask
 ics
@@ -14,5 +14,6 @@ python-dateutil
 traitlets
 werkzeug
 git+https://github.com/mikicz/arca.git#egg=arca
-cssutils~=1.0
+cssutils
 gitpython
+click
