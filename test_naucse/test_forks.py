@@ -63,9 +63,9 @@ def fork():
 
     1) Copies the entire local state of naucse
     2) Adds one working course and one working run
-    3) Commits everything at branch ``test_branch``
+    3) Commits everything on branch ``test_branch``
     4) Adds one more course and one more run, but breaks all rendering
-    5) Commits the broken state at ``test_broken_branch``
+    5) Commits the broken state on ``test_broken_branch``
     6) Deletes the fork once pytest finishes using this fixture
     """
 
@@ -201,7 +201,7 @@ def test_run_info(model):
 
 def test_course_render(model):
     """ This tests that course pages are rendered correctly (course, sessions, lessons)
-    Also tests that run pages (calendar) aren't rendered.
+    Also tests that run pages (calendar) aren't rendered for courses.
     """
     assert model.courses["test-course"].render_course()
     with pytest.raises(BuildError):
@@ -273,7 +273,7 @@ def test_cache_offer(model):
 
     assert result["content"] is None
 
-    # also test that if a key is provided, but a key that's gonna be rejected
+    # also test that if provided a key which is gonna be rejected, content is  rendered
 
     result = model.courses["test-course"].render_page("beginners/cmdline", "index", None,
                                                       content_key=content_key + "asdfasdf",
@@ -399,7 +399,7 @@ def test_get_footer_links(model):
     with pytest.raises(BuildError):
         course.get_footer_links("custom/non-existing", "index")
 
-    # test nonsence page
+    # test nonsense page
 
     with pytest.raises(BuildError):
         course.get_footer_links("beginners/cmdline", "some-subpage")

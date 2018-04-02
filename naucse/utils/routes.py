@@ -11,7 +11,7 @@ import cssutils
 from arca.exceptions import PullError, BuildError, RequirementsMismatch
 from arca.utils import get_last_commit_modifying_files
 
-urls_from_forks = deque()
+absolute_urls_to_freeze = deque()
 
 
 def get_recent_runs(course):

@@ -116,7 +116,7 @@ class State:
 > Bude se ti to hodit.
 
 Všimni si, že metody berou argument `self`.
-To označuje konkrétní obbjekt, stav hry se kterým metoda pracuje nebo
+To označuje konkrétní objekt, stav hry se kterým metoda pracuje nebo
 který mění.
 Ke všem atributúm přistupují pomocí tečky –
 <code>self.<var>jméno_atributu</var></code>.
@@ -339,16 +339,13 @@ To je dobré udělat hned poté, co nové souřadnice hlavy získáš – konkr�
 hned před řádkem `new_head = new_x, new_y` v metodě `move`.
 
 A co při takovém nárazu udělat?
-Určitě sis už všiml{{a}}, že jakákoli chyba ukončí program.
-Nejjednodušší způsob ukončení programu je právě to – stačí tedy vyvolat chybu.
-Nejkratší způsob, jak v Pythonu vyvolat na určitém místě chybu, je dělení
-nulou: `1/0`.
+Nejjednodušší bude hru ukončit.
+Na to má Python funkci `exit()`, která funguje podobně jako když v programu
+nastane chyba.
+Jen místo chybového výpisu ukáže daný text.
 
-Vyvolání chyby není příliš hezký a čistý způsob jak hráči signalizovat
-*GAME OVER*.
-Ani `1/0` není příliš hezký a čistý způsob jak vyvolat chybu.
-Za chvíli ale tuhle část předěláme, tak prozatím postačí rychlý a škaredý kód.
-Jen se s ním moc nechlub.
+Ukončení programu není příliš příjemný způsob, jak říct hráčovi že prohrál.
+Za chvíli ale tuhle část předěláme, tak prozatím tenhle jednoduchý způsob postačí.
 
 ```python
     def move(self):
@@ -359,7 +356,7 @@ Jen se s ním moc nechlub.
 
         # Nový kód – kontrola vylezení z hrací plochy
         if new_x < 0:
-            1/0     # Vyvolání chyby -- GAME OVER
+            exit('GAME OVER')
 
         new_head = new_x, new_y
         self.snake.append(new_head)
@@ -396,13 +393,13 @@ Vyzkoušej všechny varianty – severní, jižní, východní i západní zeď.
 
         # Kontrola vylezení z hrací plochy
         if new_x < 0:
-            1/0     # Vyvolání chyby -- GAME OVER
+            exit('GAME OVER')
         if new_y < 0:
-            1/0     # Vyvolání chyby -- GAME OVER
+            exit('GAME OVER')
         if new_x >= self.width:
-            1/0     # Vyvolání chyby -- GAME OVER
+            exit('GAME OVER')
         if new_y >= self.height:
-            1/0     # Vyvolání chyby -- GAME OVER
+            exit('GAME OVER')
 
         new_head = new_x, new_y
         self.snake.append(new_head)
@@ -425,8 +422,8 @@ state.height = window.height // TILE_SIZE
 Teď místo konce hry při naražení necháme hada „projít“ a objevit se na druhé
 straně.
 
-Nemělo by to být tak složité udělat – stačí místo `1/0` vždy správně nastavit
-příslušnou hodnotu.
+Nemělo by to být tak složité udělat – stačí místo `exit()` vždy správně
+nastavit příslušnou hodnotu.
 Je ale potřeba si dát pozor kde použít `new_x` a kde `new_y`, kde `width` a kde
 `height`, a kde přičíst nebo odečíst jedničku, aby při číslování od nuly
 všechno sedělo.
@@ -517,7 +514,7 @@ s jídlem, tak jídlo zmizelo.
 K tomu se dá použít operátor `in`, který zjišťuje jestli něco (třeba
 souřadnice) je v nějakém seznamu (třeba seznamu souřadnic jídla),
 a metoda `remove`, která ze seznamu odstraní daný prvek (podle hodnoty prvku,
-na rozdíl od `del` který maže podle pozice).
+na rozdíl od `del`, který maže podle pozice).
 
 Nebudu napínat, kód je následující.
 Rozumíš mu?
@@ -558,7 +555,7 @@ Neboli přeloženo do Pythonu:
             del self.snake[0]
 ```
 
-Pro ty co se začínají ztrácet dám k dispozici celou metodu `move`.
+Pro ty, co se začínají ztrácet, dám k dispozici celou metodu `move`.
 Běda ale těm, kdo opisují kód bez toho aby mu rozuměli!
 
 {% filter solution %}
@@ -620,7 +617,7 @@ print('Na kostce padlo:', random.randrange(6))
 Čím se liší `random.randrange` od klasické hrací kostky?
 Uměl{{a}} bys program upravit tak, aby padalo 1 až 6?
 
-Je tahle změna užitečná? Jaký rozsah čísel potřebujeme pro hadí jídlo?
+Je tahle změna užitečná pro naši hru? Jaký rozsah čísel potřebujeme pro hadí jídlo?
 
 Až na to přijdeš, zkus přidat náhodu do programu: jídlo by se mělo objevit
 na *úplně náhjodném* políčku na herní ploše.
@@ -693,17 +690,17 @@ Pak budou na začátku hry na hada čekat dvě náhodné jídla.
 ## Konec
 
 Had teď může narůst do obrovských rozměrů – a hru stále nelze prohrát.
-Zařídíme tedy, aby hra skončila když had narazí sám do sebe.
+Zařídíme tedy, aby hra skončila, když had narazí sám do sebe.
 
-Na rozdíl od `0/1`, které jsme použilki výše, buďme trochu opatrnější.
+Na rozdíl od `0/1`, které jsme použili výše, buďme trochu opatrnější.
 Není dobré ukončit celý program; to by se hráčům moc nelíbilo.
-Ostatně, zkus si jak to působí – následující kód dej na správné místo
+Ostatně, zkus si, jak to působí – následující kód dej na správné místo
 a zkus, jak se hra hraje, když skončí hned po nárazu:
 
 ```python
         # Kontrola, jestli had narazil
         if new_head in self.snake:
-            1/0  # GAME OVER!
+            exit('GAME OVER')
 ```
 
 {% filter solution %}
@@ -748,7 +745,7 @@ kousky kódu, které prohru implementují:
 {% filter solution %}
 * „Prvotní nastavení atributu“ do metody `__init__`.
 * „Kontrola, jestli had narazil“ do `move` místo původní kontroly,
-  kdy se hra ukončila pomocí `1/0`.
+  kdy se hra ukončila pomocí `exit()`.
 * „Zabránění pohybu“ na úplný začátek metody `move` (příkaz `return`
   okamžitě ukončí provádění metody).
 * „Grafická indikace“ do `ui.py`, za sekci pro vybírání obrázku pro kousek
@@ -767,7 +764,7 @@ A možná není úplně jednoduché přijít na to, proč.
 
 Můžou za to (hlavně) dva důvody.
 
-První problém: když když zmáčkneš dvě šipky rychle za sebou, v dalším „tahu“
+První problém: když zmáčkneš dvě šipky rychle za sebou, v dalším „tahu“
 hada se projeví jen ta druhá.
 Z pohledu programu je to chování (snad) jasné – po stisknutí šipky se uloží
 její směr, a při „tahu“ hada se použije poslední uložený směr.
@@ -800,7 +797,7 @@ def on_key_press(symbol, mod):
     state.queued_directions.append(new_direction)
 ```
 
-A zpátky v logice, v `had.py`, pakv metodě `move` místo
+A zpátky k logice, v `had.py` v metodě `move` místo
 `dir_x, dir_y = self.snake_direction` z fronty vyber první nepoužitý prvek
 (a nezapomeň ho z fronty smazat, ať se dostane i na další!):
 
@@ -988,7 +985,7 @@ Zkus třeba následující rozšíření:
 
 * Hra se bude postupně zrychlovat.<br>
   *(Na to je nejlepší předělat funkci `move` v `ui.py`, aby *sama*
-  naplánovala kdy se má příště zavolat. Volání `schedule_interval` tak už
+  naplánovala, kdy se má příště zavolat. Volání `schedule_interval` tak už
   nebude potřeba.)*
 
 * Hadi budou dva; druhý se ovládá klávesami
