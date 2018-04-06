@@ -16,6 +16,7 @@ from werkzeug.local import LocalProxy
 
 from naucse import models
 from naucse.freezer import temporary_url_for_logger
+from naucse.models import allowed_elements_parser
 from naucse.templates import setup_jinja_env, vars_functions
 from naucse.urlconverters import register_url_converters
 from naucse.utils import links
@@ -212,8 +213,25 @@ def lesson_static_generator():
             yield from lesson_static_generator_dir(lesson.slug, static, static)
 
 
+def course_content(course):
+    def lesson_url(lesson, *args, **kwargs):
+        if kwargs.get("page") == "index":
+            kwargs.pop("page")
+
+        return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
+
+    return render_template(
+        "content/course.html",
+        course=course,
+        title=course.title,
+        plan=course.sessions,
+        lesson_url=lesson_url,
+        **vars_functions(course.vars)
+    )
+
+
 @app.route('/<course:course>/')
-def course(course, content_only=False):
+def course(course):
     if course.is_link():
         try:
             data_from_fork = course.render_course(request_url=request.path)
@@ -229,45 +247,29 @@ def course(course, content_only=False):
                 root_slug=model.meta.slug,
                 travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
-
-        try:
-            # get the edit information if came in the response
-            edit_info = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
-
-            return render_template(
-                "link/course_link.html",
-                course=course,
-                edit_info=edit_info,
-                content=data_from_fork.get("content"),
-                recent_runs=get_recent_runs(course)
-            )
-        except TemplateNotFound:
-            abort(404)
-
-    def lesson_url(lesson, *args, **kwargs):
-        if kwargs.get("page") == "index":
-            kwargs.pop("page")
-
-        return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
-
-    # this function is used in the fork to generate the content, but only the actual content is needed
-    if content_only:
-        template_name = 'content/course.html'
-        recent_runs = None  # the variable isn't used in content
+        kwargs = {
+            "course_content": data_from_fork.get("content"),
+            "edit_info": links.EditInfo.get_edit_link(data_from_fork.get("edit_info")),
+        }
     else:
-        template_name = 'course.html'  # includes 'content/course.html'
-        recent_runs = get_recent_runs(course)
+        content = course_content(course)
+        allowed_elements_parser.reset_and_feed(content)
+
+        kwargs = {
+            "course_content": content,
+            "edit_path": course.edit_path,
+        }
+
+    recent_runs = get_recent_runs(course)
 
     try:
         return render_template(
-            template_name,
+            "course.html",
             course=course,
-            plan=course.sessions,
             title=course.title,
-            lesson_url=lesson_url,
             recent_runs=recent_runs,
-            **vars_functions(course.vars),
-            edit_path=course.edit_path)
+            **kwargs
+        )
     except TemplateNotFound:
         abort(404)
 

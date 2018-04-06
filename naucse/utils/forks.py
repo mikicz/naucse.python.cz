@@ -105,7 +105,7 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
             }
 
             if page_type == "course":
-                info["content"] = routes.course(course, content_only=True)
+                info["content"] = routes.course_content(course)
 
             elif page_type == "calendar":
                 info["content"] = routes.course_calendar(course, content_only=True)
