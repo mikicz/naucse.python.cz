@@ -545,7 +545,7 @@ def course_link_page(course, lesson_slug, page, solution):
         solution_number = int(solution)
 
     try:
-        course = links.CourseLink(data_from_fork.get("course", {}))
+        course = links.CourseLink(data_from_fork.get("course", {}), slug=course.slug)
 
         session = links.SessionLink.get_session_link(data_from_fork.get("session"))
         edit_info = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
@@ -643,9 +643,44 @@ def lesson(lesson, page, solution=None):
                        static_url=static_url)
 
 
+def session_coverpage_content(course, session, coverpage):
+    def lesson_url(lesson, *args, **kwargs):
+        if kwargs.get("page") == "index":
+            kwargs.pop("page")
+
+        return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
+
+
+    content = session.get_coverpage_content(course, coverpage, app)
+
+    homework_section = False
+    link_section = False
+    cheatsheet_section = False
+    for mat in session.materials:
+        if mat.url_type == "homework":
+            homework_section = True
+        if mat.url_type == "link":
+            link_section = True
+        if mat.url_type == "cheatsheet":
+            cheatsheet_section = True
+
+    return render_template(
+        "content/coverpage.html" if coverpage == "front" else "content/backpage.html",
+        course=course,
+        session=session,
+        homework_section=homework_section,
+        link_section=link_section,
+        cheatsheet_section=cheatsheet_section,
+        content=content,
+        lesson_url=lesson_url,
+        **vars_functions(course.vars),
+    )
+
+
+
 @app.route('/<course:course>/sessions/<session>/', defaults={'coverpage': 'front'})
 @app.route('/<course:course>/sessions/<session>/<coverpage>/')
-def session_coverpage(course, session, coverpage, content_only=False):
+def session_coverpage(course, session, coverpage):
     """Render the session coverpage.
 
     Args:
@@ -673,61 +708,26 @@ def session_coverpage(course, session, coverpage, content_only=False):
                 travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
-        try:
-            course = links.CourseLink(data_from_fork.get("course", {}))
-            session = links.SessionLink.get_session_link(data_from_fork.get("session"))
-            edit_info = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
-
-            return render_template(
-                "link/coverpage_link.html",
-                course=course,
-                session=session,
-                edit_info=edit_info,
-
-                content=data_from_fork.get("content"),
-            )
-        except TemplateNotFound:
-            abort(404)
-
-
-    session = course.sessions.get(session)
-
-    def lesson_url(lesson, *args, **kwargs):
-        if kwargs.get("page") == "index":
-            kwargs.pop("page")
-
-        return url_for('course_page', course=course, lesson=lesson, *args, **kwargs)
-
-    content = session.get_coverpage_content(course, coverpage, app)
-
-    if content_only:
-        # when used in fork, only the actual content is needed
-        template = "content/coverpage.html" if coverpage != "back" else "content/backpage.html"
+        kwargs = {
+            "course": links.CourseLink(data_from_fork.get("course", {}), slug=course.slug),
+            "session": links.SessionLink.get_session_link(data_from_fork.get("session")),
+            "edit_info": links.EditInfo.get_edit_link(data_from_fork.get("edit_info")),
+            "content": data_from_fork["content"]
+        }
     else:
-        # includes the ``content/coverpage.html`` or ``content/backpage.html``
-        template = "coverpage.html" if coverpage != "back" else "backpage.html"
+        session = course.sessions.get(session)
 
-    homework_section = False
-    link_section = False
-    cheatsheet_section = False
-    for mat in session.materials:
-        if mat.url_type == "homework":
-            homework_section = True
-        if mat.url_type == "link":
-            link_section = True
-        if mat.url_type == "cheatsheet":
-            cheatsheet_section = True
+        content = session_coverpage_content(course, session, coverpage)
+        allowed_elements_parser.reset_and_feed(content)
 
-    return render_template(template,
-                           content=content,
-                           session=session,
-                           course=course,
-                           lesson_url=lesson_url,
-                           **vars_functions(course.vars),
-                           edit_path=session.get_edit_path(course, coverpage),
-                           homework_section=homework_section,
-                           link_section=link_section,
-                           cheatsheet_section=cheatsheet_section)
+        kwargs = {
+            "course": course,
+            "session": session,
+            "edit_path": session.get_edit_path(course, coverpage),
+            "content": content
+        }
+
+    return render_template("coverpage.html", **kwargs)
 
 
 @app.route('/<course:course>/calendar/')
@@ -748,7 +748,7 @@ def course_calendar(course, content_only=False):
             )
 
         try:
-            course = links.CourseLink(data_from_fork.get("course", {}))
+            course = links.CourseLink(data_from_fork.get("course", {}), slug=course.slug)
             edit_info = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
 
             return render_template(

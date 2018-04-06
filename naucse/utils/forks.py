@@ -184,7 +184,7 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                         "title": session.title,
                         "url": url_for("session_coverpage", course=course.slug, session=session.slug),
                     },
-                    "content": routes.session_coverpage(course, session_slug, coverpage, content_only=True),
+                    "content": routes.session_coverpage_content(course, session, coverpage),
                     "edit_url": edit_link(session.get_edit_path(course, coverpage))
                 })
             else:

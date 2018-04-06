@@ -8,12 +8,13 @@ from naucse.utils.routes import DisallowedStyle
 
 class CourseLink:
 
-    def __init__(self, course):
+    def __init__(self, course, slug=None):
         self.title = course["title"]
         self.url = course["url"]
         self.vars = course.get("vars", {})
         self.canonical = course.get("canonical")
         self.is_derived = course.get("is_derived")
+        self.slug = slug
 
 
 class SessionLink:
