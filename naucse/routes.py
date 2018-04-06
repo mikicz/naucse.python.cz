@@ -730,8 +730,22 @@ def session_coverpage(course, session, coverpage):
     return render_template("coverpage.html", **kwargs)
 
 
+def course_calendar_content(course):
+    sessions_by_date = {s.date: s for s in course.sessions.values()}
+
+    return render_template(
+        'content/course_calendar.html',
+        course=course,
+        sessions_by_date=sessions_by_date,
+        months=list_months(course.start_date,
+                           course.end_date),
+        calendar=calendar.Calendar()
+    )
+
+
+
 @app.route('/<course:course>/calendar/')
-def course_calendar(course, content_only=False):
+def course_calendar(course):
     if course.is_link():
         try:
             data_from_fork = course.render_calendar(request_url=request.path)
@@ -747,37 +761,28 @@ def course_calendar(course, content_only=False):
                 travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
             )
 
-        try:
-            course = links.CourseLink(data_from_fork.get("course", {}), slug=course.slug)
-            edit_info = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
+        course = links.CourseLink(data_from_fork.get("course", {}), slug=course.slug)
+        edit_info = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
 
-            return render_template(
-                "link/course_calendar_link.html",
-                course=course,
-                edit_info=edit_info,
-                content=data_from_fork.get("content"),
-            )
-        except TemplateNotFound:
+        kwargs = {
+            "course": course,
+            "edit_info": edit_info,
+            "content": data_from_fork.get("content")
+        }
+    else:
+        if not course.start_date:
             abort(404)
 
-    if not course.start_date:
-        abort(404)
+        content = course_calendar_content(course)
+        allowed_elements_parser.reset_and_feed(content)
 
-    if content_only:
-        # when in fork, only the actual calendar is needed
-        template = 'content/course_calendar.html'
-    else:
-        # includes ``content/course_calendar.html``
-        template = 'course_calendar.html'
+        kwargs = {
+            "course": course,
+            "edit_path": course.edit_path,
+            "content": content
+        }
 
-    sessions_by_date = {s.date: s for s in course.sessions.values()}
-    return render_template(template,
-                           edit_path=course.edit_path,
-                           course=course,
-                           sessions_by_date=sessions_by_date,
-                           months=list_months(course.start_date,
-                                              course.end_date),
-                           calendar=calendar.Calendar())
+    return render_template('course_calendar.html', **kwargs)
 
 
 def generate_calendar_ics(course):
