@@ -6,5 +6,5 @@
 {% endblock %}
 
 {% block course_content %}
-  {% include "content/coverpage.html" %}
+  {{ content|safe }}
 {% endblock %}
