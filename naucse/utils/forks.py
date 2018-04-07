@@ -118,7 +118,9 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 lesson = routes.model.get_lesson(lesson_slug)
 
                 content_offer_key = kwargs.get("content_key")
-                content = -1
+
+                not_processed = object()
+                content = not_processed
 
                 if content_offer_key is not None:
                     # the base repository has a cached version of the content
@@ -129,10 +131,19 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                     if content_offer_key == content_key:
                         content = None
 
+                request_url = kwargs.get("request_url")
+                if request_url is None:
+                    request_url = url_for('course_page', course=course, lesson=lesson, page=page, solution=solution)
+
+                lesson_url, subpage_url, static_url = routes.relative_url_functions(request_url, course, lesson)
+                page, session, prv, nxt = routes.get_page(course, lesson, page)
+
                 # if content isn't cached or the version was refused, let's render
                 # the content here (but just the content and not the whole page with headers, menus etc)
-                if content == -1:
-                    content = routes.course_page(course, lesson, page, solution, content_only=True)
+                if content is not_processed:
+                    content = routes.page_content(lesson, page, solution, course,
+                                                  lesson_url=lesson_url, subpage_url=subpage_url, static_url=static_url,
+                                                  without_cache=True)
 
                 if content is None:
                     info["content"] = None
@@ -140,8 +151,6 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 else:
                     info["content"] = content["content"]
                     info["content_urls"] = content["urls"]
-
-                page, session, prv, nxt = routes.get_page(course, lesson, page)
 
                 info.update({
                     "page": {
@@ -158,14 +167,9 @@ def render(page_type: str, slug: str, *args, **kwargs) -> Dict[str, Any]:
                 if session is not None:
                     info["session"] = {
                         "title": session.title,
-                        "url": url_for("session_coverpage", course=course.slug, session=session.slug)
+                        "url": url_for("session_coverpage", course=course.slug, session=session.slug),
+                        "slug": session.slug,
                     }
-
-                request_url = kwargs.get("request_url")
-                if request_url is None:
-                    request_url = url_for('course_page', course=course, lesson=lesson, page=page, solution=solution)
-
-                lesson_url, *_ = routes.relative_url_functions(request_url, course, lesson)
 
                 prev_link, session_link, next_link = routes.get_footer_links(course, session, prv, nxt, lesson_url)
                 info["footer"] = {

@@ -274,95 +274,6 @@ def course(course):
         abort(404)
 
 
-def render_page(page, solution=None, vars=None, **kwargs):
-    """ Renders a specific lesson, its subpage or a solution.
-    """
-    lesson = page.lesson
-
-    course = kwargs.get("course", None)
-    content_only = kwargs.get("content_only", False)
-    static_url = kwargs.get("static_url")
-
-    if static_url is None:
-        def static_url(path):
-            return url_for('lesson_static', lesson=lesson, path=path, course=course)
-
-    content = cached = None
-
-    try:
-        def content_creator():
-            """ Returns the content and all relative urls used in it.
-
-            Since the content is stored in cache and can be reused elsewhere, urls
-            must be stored as relative to the current page, so new absolute urls can be generated
-            where the content is reused.
-            """
-            with temporary_url_for_logger(app) as logger:
-                with logger:
-                    content = page.render_html(
-                        solution=solution,
-                        static_url=static_url,
-                        lesson_url=kwargs.get('lesson_url', lesson_url),
-                        subpage_url=kwargs.get('subpage_url', None),
-                        vars=vars
-                    )
-
-                absolute_urls = [url_for(logged[0], **logged[1]) for logged in logger.logged_calls]
-
-            relative_urls = [get_relative_url(request.path, x) for x in absolute_urls]
-
-            return {"content": content, "urls": relative_urls}
-
-        content_key = page_content_cache_key(Repo("."), lesson.slug, page.slug, solution,
-                                             course.vars if course is not None else None)
-
-        # only use the cache if there are no local changes and not rendering in fork
-        if content_only or arca.is_dirty():
-            cached = content_creator()
-            content = cached["content"]
-        else:
-            # since ARCA_IGNORE_CACHE_ERRORS is used, this won't fail in forks even if the cache doesn't work
-            # this is only dangerous if the fork sets absolute path to cache and
-            # CurrentEnvironmentBackend or VenvBackend are used locally
-            # FIXME? But I don't think there's a way to prevent writing to a file in those backends
-            cached = arca.region.get_or_create(content_key, content_creator)
-
-            # the urls are added twice to ``absolute_urls_to_freeze`` when the content is created
-            # but it doesn't matter, duplicate urls are skipped
-            absolute_urls = [get_absolute_url(request.path, x) for x in cached["urls"]]
-            absolute_urls_to_freeze.extend(absolute_urls)
-
-            content = cached["content"]
-
-    except FileNotFoundError:
-        abort(404)
-
-    # when used in fork, only the content and the urls are needed
-    if content_only:
-        return cached
-
-    kwargs.setdefault('lesson', lesson)
-    kwargs.setdefault('page', page)
-
-    if solution is not None:
-        template_name = 'solution.html'
-        kwargs.setdefault('solution_number', solution)
-    else:
-        template_name = 'lesson.html'
-
-    kwargs.setdefault('title', page.title)
-    kwargs.setdefault('content', content)
-    kwargs.setdefault('root_slug', model.meta.slug)
-
-    # when rendering canonical version instead of a failing fork content is used,
-    # a widget is added to the page with a warning and a link to Travis,
-    # and if TRAVIS_BUILD_ID is set, we can link to the current build
-    kwargs.setdefault('travis_build_id', os.environ.get("TRAVIS_BUILD_ID"))
-
-    return render_template(template_name, **kwargs, **vars_functions(vars),
-                           edit_path=page.edit_path)
-
-
 def get_page(course, lesson, page):
     for session in course.sessions.values():
         for material in session.materials:
@@ -465,167 +376,189 @@ def relative_url_functions(current_url, course, lesson):
     return lesson_url, subpage_url, static_url
 
 
-def course_link_page(course, lesson_slug, page, solution):
-    """ Builds a lesson page from a fork.
+def page_content(lesson, page, solution=None, course=None, lesson_url=None, subpage_url=None, static_url=None,
+                 without_cache=False):
+    variables = None
+    if course is not None:
+        variables = course.vars
 
-    1) checks if a content fragment is in cache, retrieve it to offer it
-    2) calls  Arca to run render in the fork code
-        a) renders returned content here with local templates for headers, footer, etc.
-        b) if the task fails and the lesson is canonical (exists in this repo), renders current version with a warning
-    """
-    canonical_url = None
-    kwargs = {"request_url": request.path}
+    def content_creator():
+        """ Returns the content and all relative urls used in it.
 
-    # if the page is canonical (exists in the root repository), retrieve it to get the canonical url
-    # and for possible use if the lesson render fails in the fork
-    try:
-        lesson = model.get_lesson(lesson_slug)
-        canonical_url = url_for('lesson', lesson=lesson, _external=True)
-    except LookupError:
-        lesson = None
+        Since the content is stored in cache and can be reused elsewhere, urls
+        must be stored as relative to the current page, so new absolute urls can be generated
+        where the content is reused.
+        """
+        with temporary_url_for_logger(app) as logger:
+            with logger:
+                content = page.render_html(
+                    solution=solution,
+                    static_url=static_url,
+                    lesson_url=lesson_url,
+                    subpage_url=subpage_url,
+                    vars=variables
+                )
 
-    try:
-        # checks if the rendered page content is in cache locally to offer it to the fork
-        # ``course.vars`` calls ``course_info`` so it has to be in the try block
-        # the function can also raise FileNotFoundError if the lesson doesn't exist in repo
-        content_key = page_content_cache_key(arca.get_repo(course.repo, course.branch),
-                                             lesson_slug, page, solution, course.vars)
-        content_offer = arca.region.get(content_key)
+            absolute_urls = [url_for(logged[0], **logged[1]) for logged in logger.logged_calls]
 
-        if content_offer:
-            kwargs.update({
-                "content_key": content_key,
-            })
+        relative_urls = [get_relative_url(request.path, x) for x in absolute_urls]
 
-        data_from_fork = course.render_page(lesson_slug, page, solution, **kwargs)
+        return {"content": content, "urls": relative_urls}
 
-        content = data_from_fork["content"]
+    content_key = page_content_cache_key(Repo("."), lesson.slug, page.slug, solution, variables)
 
-        if content is None:
-            content = content_offer["content"]
-            absolute_urls_to_freeze.extend([get_absolute_url(request.path, x) for x in content_offer["urls"]])
-        else:
-            arca.region.set(content_key, {"content": content, "urls": data_from_fork["content_urls"]})
-            absolute_urls_to_freeze.extend([get_absolute_url(request.path, x) for x in data_from_fork["content_urls"]])
+    # only use the cache if there are no local changes and not rendering in fork
+    if without_cache or arca.is_dirty():
+        return content_creator()
 
-        # get PageLink here since css parsing is in it so the exception can be caught here
-        page = links.PageLink(data_from_fork.get("page", {}))
-    except POSSIBLE_FORK_EXCEPTIONS as e:
-        if raise_errors_from_forks():
-            raise
+    # since ARCA_IGNORE_CACHE_ERRORS is used, this won't fail in forks even if the cache doesn't work
+    # this is only dangerous if the fork sets absolute path to cache and
+    # CurrentEnvironmentBackend or VenvBackend are used locally
+    # FIXME? But I don't think there's a way to prevent writing to a file in those backends
+    cached = arca.region.get_or_create(content_key, content_creator)
 
-        logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
-        if lesson is not None:
-            try:
-                logger.error("Rendering the canonical version with a warning.")
-                return course_page(course=course, lesson=lesson_slug, page=page, solution=solution,
-                                   error_in_fork=True)
-            except Exception as canonical_error:
-                logger.error("Rendering the canonical version failed.")
-                logger.exception(canonical_error)
+    # the urls are added twice to ``absolute_urls_to_freeze`` when the content is created
+    # but it doesn't matter, duplicate urls are skipped
+    absolute_urls = [get_absolute_url(request.path, x) for x in cached["urls"]]
+    absolute_urls_to_freeze.extend(absolute_urls)
 
-        logger.exception(e)
-        return render_template(
-            "error_in_fork.html",
-            malfunctioning_course=course,
-            edit_path=course.edit_path,
-            faulty_page="lesson",
-            lesson=lesson_slug,
-            pg=page,  # avoid name conflict
-            solution=solution,
-            root_slug=model.meta.slug,
-            travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
-        )
-
-    # from naucse.utils import render
-    # data_from_fork = render("course_page", course.slug, lesson_slug, page, solution, **kwargs)
-
-    solution_number = None
-    if solution is not None:
-        solution_number = int(solution)
-
-    try:
-        course = links.CourseLink(data_from_fork.get("course", {}), slug=course.slug)
-
-        session = links.SessionLink.get_session_link(data_from_fork.get("session"))
-        edit_info = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
-
-        footer = data_from_fork["footer"]
-        title = '{}: {}'.format(course.title, page.title)
-
-        return render_template(
-            "link/lesson_link.html",
-            course=course,
-            title=title,
-            page=page,
-            session=session,
-
-            solution_number=solution_number,
-            canonical_url=canonical_url,
-            edit_info=edit_info,
-
-            content=content,
-
-            prev_link=footer.get("prev_link"),
-            session_link=footer.get("session_link"),
-            next_link=footer.get("next_link"),
-        )
-    except TemplateNotFound:
-        abort(404)
-
+    return cached
 
 
 @app.route('/<course:course>/<lesson_slug:lesson>/', defaults={'page': 'index'})
 @app.route('/<course:course>/<lesson_slug:lesson>/<page>/')
 @app.route('/<course:course>/<lesson_slug:lesson>/<page>/solutions/<int:solution>/')
-def course_page(course, lesson, page, solution=None, content_only=False, **kwargs):
-    """ Render the html of the given lesson page in the course.
-
-    The lesson url convertor can't be used since there can be new lessons in the forked repositories,
-    however if the course isn't a lik to a fork and the lesson doesn't exist in the current repository,
-    the function returns a 404
-    """
-    error_in_fork = kwargs.get("error_in_fork", False)
-
-    if course.is_link() and not error_in_fork:
-        return course_link_page(course, lesson, page, solution)
+def course_page(course, lesson, page, solution=None):
+    lesson_slug = lesson
+    page_slug = page
 
     try:
-        lesson = model.get_lesson(lesson)
+        lesson = model.get_lesson(lesson_slug)
+        canonical_url = url_for('lesson', lesson=lesson, _external=True)
     except LookupError:
-        abort(404)
+        lesson = canonical_url = None
 
-    lesson_url, subpage_url, static_url = relative_url_functions(request.path, course, lesson)
+    kwargs = {}
+    prev_link = session_link = next_link = session = None
 
-    if not error_in_fork:
+    if course.is_link():
+        fork_kwargs = {"request_url": request.path}
+
+        try:
+            # checks if the rendered page content is in cache locally to offer it to the fork
+            # ``course.vars`` calls ``course_info`` so it has to be in the try block
+            # the function can also raise FileNotFoundError if the lesson doesn't exist in repo
+            content_key = page_content_cache_key(arca.get_repo(course.repo, course.branch),
+                                                 lesson_slug, page, solution, course.vars)
+            content_offer = arca.region.get(content_key)
+
+            # we've got the fragment in cache, let's offer it to the fork;
+            if content_offer:
+                fork_kwargs["content_key"] = content_key
+
+            data_from_fork = course.render_page(lesson_slug, page, solution, **fork_kwargs)
+
+            content = data_from_fork["content"]
+
+            if content is None:  # if a offer was accepted
+                content = content_offer["content"]
+                absolute_urls_to_freeze.extend([get_absolute_url(request.path, x)
+                                                for x in content_offer["urls"]])
+            else:  # if the offer was rejected or the the fragment was not in cache
+                arca.region.set(content_key, {"content": content, "urls": data_from_fork["content_urls"]})
+                absolute_urls_to_freeze.extend([get_absolute_url(request.path, x)
+                                                for x in data_from_fork["content_urls"]])
+
+            # compatability
+            page = links.PageLink(data_from_fork.get("page", {}))
+            course = links.CourseLink(data_from_fork.get("course", {}), slug=course.slug)
+            session = links.SessionLink.get_session_link(data_from_fork.get("session"))
+            kwargs["edit_info"] = links.EditInfo.get_edit_link(data_from_fork.get("edit_info"))
+
+            footer = data_from_fork.get("footer", {})
+            prev_link = footer.get("prev_link")
+            session_link = footer.get("session_link")
+            next_link = footer.get("next_link")
+        except POSSIBLE_FORK_EXCEPTIONS as e:
+            if raise_errors_from_forks():
+                raise
+
+            rendered_replacement = False
+
+            logger.error("There was an error rendering url %s for course '%s'", request.path, course.slug)
+            if lesson is not None:
+                try:
+                    logger.error("Rendering the canonical version with a warning.")
+
+                    lesson_url, subpage_url, static_url = relative_url_functions(request.path, course, lesson)
+                    page = lesson.pages[page]
+                    content = page_content(
+                        lesson, page, solution, course,
+                        lesson_url=lesson_url, subpage_url=subpage_url, static_url=static_url
+                    )
+
+                    try:
+                        prev_link, session_link, next_link = course.get_footer_links(lesson.slug, page_slug,
+                                                                                     request_url=request.path)
+                    except POSSIBLE_FORK_EXCEPTIONS as e:
+                        # the fork is failing spectacularly, the footer links aren't that important
+                        logger.error("Could not retrieve even footer links from the fork at page %s", request.path)
+                        logger.exception(e)
+
+                    rendered_replacement = True
+
+                except Exception as canonical_error:
+                    logger.error("Rendering the canonical version failed.")
+                    logger.exception(canonical_error)
+
+            if not rendered_replacement:
+                logger.exception(e)
+                return render_template(
+                    "error_in_fork.html",
+                    malfunctioning_course=course,
+                    edit_path=course.edit_path,
+                    faulty_page="lesson",
+                    lesson=lesson_slug,
+                    pg=page_slug,  # avoid name conflict
+                    solution=solution,
+                    root_slug=model.meta.slug,
+                    travis_build_id=os.environ.get("TRAVIS_BUILD_ID"),
+                )
+    else:
+        if lesson is None:
+            abort(404)
+
+        lesson_url, subpage_url, static_url = relative_url_functions(request.path, course, lesson)
         page, session, prv, nxt = get_page(course, lesson, page)
         prev_link, session_link, next_link = get_footer_links(course, session, prv, nxt, lesson_url)
-    else:  # rendering canonical version instead of a failing forked page
-        try:
-            prev_link, session_link, next_link = course.get_footer_links(lesson.slug, page, request_url=request.path)
-            page = lesson.pages[page]
-        except POSSIBLE_FORK_EXCEPTIONS as e:
-            # the fork is failing spectacularly, the footer links aren't that important
-            logger.error("Could not retrieve even footer links from the fork at page %s", request.path)
-            logger.exception(e)
-            prev_link = session_link = next_link = None
 
-    canonical_url = url_for('lesson', lesson=lesson, _external=True)
-    title = '{}: {}'.format(course.title, page.title)
+        content = page_content(
+            lesson, page, solution, course=course, lesson_url=lesson_url, subpage_url=subpage_url, static_url=static_url
+        )
+        content = content["content"]
+        allowed_elements_parser.reset_and_feed(content)
 
-    return render_page(page=page, title=title,
-                       lesson_url=lesson_url,
-                       subpage_url=subpage_url,
-                       canonical_url=canonical_url,
-                       static_url=static_url,
-                       course=course,
-                       solution=solution,
-                       vars=course.vars,
-                       prev_link=prev_link,
-                       session_link=session_link,
-                       next_link=next_link,
-                       content_only=content_only,
-                       **kwargs)
+        kwargs["edit_path"] = page.edit_path
+
+    if solution is not None:
+        kwargs["solution_number"] = int(solution)
+
+    return render_template(
+        "lesson.html",
+        canonical_url=canonical_url,
+        title='{}: {}'.format(course.title, page.title),
+        content=content,
+        prev_link=prev_link,
+        session_link=session_link,
+        next_link=next_link,
+        root_slug=model.meta.slug,
+        course=course,
+        lesson=lesson,
+        page=page,
+        solution=solution,
+        session=session,
+        **kwargs
+    )
 
 
 @app.route('/lessons/<lesson:lesson>/', defaults={'page': 'index'})
@@ -637,11 +570,27 @@ def lesson(lesson, page, solution=None):
     lesson_url, subpage_url, static_url = relative_url_functions(request.path, None, lesson)
 
     page = lesson.pages[page]
-    return render_page(page=page, solution=solution,
-                       lesson_url=lesson_url,
-                       subpage_url=subpage_url,
-                       static_url=static_url)
 
+    content = page_content(lesson, page, solution=solution, lesson_url=lesson_url,
+                           subpage_url=subpage_url,
+                           static_url=static_url)
+
+    content = content["content"]
+    allowed_elements_parser.reset_and_feed(content)
+
+    kwargs = {}
+    if solution is not None:
+        kwargs["solution_number"] = int(solution)
+
+    return render_template(
+        "lesson.html",
+        content=content,
+        page=page,
+        lesson=lesson,
+        edit_path=page.edit_path,
+        title=page.title,
+        **kwargs
+    )
 
 def session_coverpage_content(course, session, coverpage):
     def lesson_url(lesson, *args, **kwargs):
@@ -710,7 +659,7 @@ def session_coverpage(course, session, coverpage):
 
         kwargs = {
             "course": links.CourseLink(data_from_fork.get("course", {}), slug=course.slug),
-            "session": links.SessionLink.get_session_link(data_from_fork.get("session")),
+            "session": links.SessionLink.get_session_link(data_from_fork.get("session"), slug=session),
             "edit_info": links.EditInfo.get_edit_link(data_from_fork.get("edit_info")),
             "content": data_from_fork["content"]
         }

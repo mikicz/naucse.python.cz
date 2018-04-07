@@ -20,14 +20,15 @@ class CourseLink:
 class SessionLink:
 
     @classmethod
-    def get_session_link(cls, session_data):
+    def get_session_link(cls, session_data, slug=None):
         if session_data is None:
             return None
-        return SessionLink(session_data["title"], session_data["url"])
+        return SessionLink(session_data["title"], session_data["url"], slug or session_data["slug"])
 
-    def __init__(self, title, url):
+    def __init__(self, title, url, slug):
         self.title = title
         self.url = url
+        self.slug = slug
 
 
 class LicenseLink:

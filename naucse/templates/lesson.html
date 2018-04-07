@@ -11,6 +11,7 @@
 {% endblock %}
 
 {% block breadcrumbs %}
+{# Only used if course is provided #}
 > <a href="{{ course_url(course) }}">{{ course.title }}</a>
 {% if session %}
 > <a href="{{ session_url(course.slug, session.slug) }}">{{ session.title }}</a>
@@ -25,7 +26,10 @@
 {% endblock %}
 
 {% block course_content %}
+    {% if solution_number|default(None) is not none %}
+        <h1>{{ page.title }} – Řešení [{{ solution_number }}]</h1>
+    {% endif %}
 
-  {{ content }}
+    {{ content }}
 
 {% endblock %}
