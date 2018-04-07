@@ -498,7 +498,7 @@ def course_page(course, lesson, page, solution=None):
                     content = page_content(
                         lesson, page, solution, course,
                         lesson_url=lesson_url, subpage_url=subpage_url, static_url=static_url
-                    )
+                    )["content"]
 
                     try:
                         prev_link, session_link, next_link = course.get_footer_links(lesson.slug, page_slug,
@@ -512,6 +512,9 @@ def course_page(course, lesson, page, solution=None):
                         logger.exception(e)
 
                     rendered_replacement = True
+                    kwargs["edit_path"] = page.edit_path
+                    kwargs["error_in_fork"] = True
+                    kwargs["travis_build_id"] = os.environ.get("TRAVIS_BUILD_ID")
 
                 except Exception as canonical_error:
                     logger.error("Rendering the canonical version failed.")
