@@ -10,5 +10,5 @@
 {% endblock %}
 
 {% block course_content %}
-  {% include "content/course_calendar.html" %}
+  {{ content|safe }}
 {% endblock %}
