@@ -321,6 +321,7 @@ def test_runs_page(mocker, client: FlaskClient):
 @pytest.mark.parametrize("url", [
     "/course/test-course/",
     "/course/test-course/sessions/first-session/",
+    "/course/test-course/sessions/first-session/back/",
     "/course/test-course/beginners/cmdline/",
     "/course/test-course/beginners/cmdline/index/solutions/0/",
     "/course/test-course/beginners/install/linux/",
@@ -337,6 +338,7 @@ def test_working_pages(url, client: FlaskClient):
 @pytest.mark.parametrize("url", [
     "/course/test-broken-course/",
     "/course/test-broken-course/sessions/first-session/",
+    "/course/test-broken-course/sessions/first-session/back/",
     "/course/test-broken-course/beginners/cmdline/",
     "/course/test-broken-course/beginners/cmdline/index/solutions/0/",
     "/course/test-broken-course/beginners/install/linux/",
