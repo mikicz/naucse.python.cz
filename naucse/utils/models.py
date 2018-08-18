@@ -20,7 +20,7 @@ def arca():
                            "ARCA_BACKEND_CURRENT_ENVIRONMENT_REQUIREMENTS": "requirements.txt",
                            "ARCA_BACKEND_VERBOSITY": 2,
                            "ARCA_BACKEND_KEEP_CONTAINER_RUNNING": True,
-                           "ARCA_BACKEND_USE_REGISTRY_NAME": "docker.io/naucse/naucse.python.cz",
+                           "ARCA_BACKEND_USE_REGISTRY_NAME": "docker.io/mikicz/naucse",
                            "ARCA_SINGLE_PULL": True,
                            "ARCA_IGNORE_CACHE_ERRORS": True,
                            "ARCA_CACHE_BACKEND": "dogpile.cache.dbm",
